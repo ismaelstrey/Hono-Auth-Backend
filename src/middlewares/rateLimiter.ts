@@ -15,6 +15,20 @@ export const clearRateLimitRecords = () => {
 }
 
 /**
+ * Função para limpar registros específicos por IP (útil para desenvolvimento)
+ */
+export const clearRateLimitForIP = (ip: string) => {
+  const keysToDelete: string[] = []
+  for (const [key] of requestCounts.entries()) {
+    if (key.startsWith(ip)) {
+      keysToDelete.push(key)
+    }
+  }
+  keysToDelete.forEach(key => requestCounts.delete(key))
+  console.log(`🧹 Rate limit records cleared for IP: ${ip}`)
+}
+
+/**
  * Configurações padrão de rate limiting
  */
 const defaultConfig: RateLimitConfig = {

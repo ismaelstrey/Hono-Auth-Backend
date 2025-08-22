@@ -8,7 +8,7 @@ import { swaggerUI } from '@hono/swagger-ui'
 import 'dotenv/config'
 
 // Importar middlewares
-import { rateLimitPublic, clearRateLimitRecords } from '@/middlewares/rateLimiter'
+import { rateLimitPublic, clearRateLimitRecords, clearRateLimitForIP } from '@/middlewares/rateLimiter'
 import { errorHandler } from '@/middlewares/errorHandler'
 
 // Importar rotas
@@ -40,6 +40,28 @@ app.get('/', (c) => {
     timestamp: new Date().toISOString()
   })
 })
+
+// Rota para limpar rate limiting (apenas em desenvolvimento)
+if (env.NODE_ENV === 'development') {
+  app.post('/api/dev/clear-rate-limit', (c) => {
+    clearRateLimitRecords()
+    return c.json({
+      success: true,
+      message: 'Rate limit records cleared',
+      timestamp: new Date().toISOString()
+    })
+  })
+
+  app.post('/api/dev/clear-rate-limit/:ip', (c) => {
+    const ip = c.req.param('ip')
+    clearRateLimitForIP(ip)
+    return c.json({
+      success: true,
+      message: `Rate limit records cleared for IP: ${ip}`,
+      timestamp: new Date().toISOString()
+    })
+  })
+}
 
 // Rotas da aplicação
 app.route('/api/auth', authRoutes)
