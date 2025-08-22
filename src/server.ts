@@ -15,6 +15,7 @@ import { errorHandler } from '@/middlewares/errorHandler'
 import { authRoutes } from '@/routes/authRoutes'
 import { userRoutes } from '@/routes/userRoutes'
 import { env, config } from '@/config/env'
+import { connectDatabase } from '@/config/database'
 
 const app = new Hono()
 
@@ -159,6 +160,10 @@ app.notFound((c) => {
 })
 
 const port = config.server.port
+
+// Inicializar conexão com banco de dados
+await connectDatabase()
+
 console.log(`🚀 Servidor rodando em ${config.server.url}`)
 console.log(`📝 Ambiente: ${env.NODE_ENV}`)
 if (config.features.swagger) {

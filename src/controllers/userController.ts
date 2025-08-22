@@ -1,17 +1,6 @@
-import type { Context, Env } from 'hono'
-import { zValidator } from '@hono/zod-validator'
+import type { Context } from 'hono'
 import { UserService } from '@/services/userService'
 import { successResponse, errorResponse } from '@/utils/helpers'
-import { UserRole } from '@/types'
-import {
-  updateUserSchema,
-  createUserSchema,
-  userFiltersSchema,
-  userIdSchema,
-  updateProfileSchema,
-  userSettingsSchema,
-  bulkUserOperationSchema
-} from '@/validators/userValidators'
 import type { JWTPayload } from '@/types'
 
 /**
@@ -254,7 +243,7 @@ export class UserController {
     try {
       const user = c.get('user')
       const settings = await this.userService.getUserSettings(user.id)
-      
+
       return c.json(successResponse(settings, 'Configurações obtidas com sucesso'))
     } catch (error) {
       console.error('Erro ao obter configurações:', error)

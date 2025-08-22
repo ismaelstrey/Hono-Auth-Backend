@@ -1,17 +1,6 @@
 import type { Context } from 'hono'
-import { zValidator } from '@hono/zod-validator'
 import { authService } from '@/services/authService'
 import { successResponse, errorResponse } from '@/utils/helpers'
-import {
-  registerSchema,
-  loginSchema,
-  forgotPasswordSchema,
-  resetPasswordSchema,
-  changePasswordSchema,
-  refreshTokenSchema,
-  verifyEmailSchema,
-  resendVerificationSchema
-} from '@/validators/authValidators'
 import type { JWTPayload } from '@/types'
 
 /**

@@ -1,96 +1,85 @@
+import { prisma } from '@/config/database'
 import type { User, CreateUserData, UpdateUserData, UserFilters } from '@/types'
-import { generateId } from '@/utils/helpers'
 import { UserRole } from '@/types'
 
-// Simulação de banco de dados em memória
-// Em produção, substitua por implementação com Prisma
-const users: User[] = [
-  {
-    id: '1',
-    email: 'admin@example.com',
-    password: '$2a$12$LQv3c1yqBWVHxkd0LHAkCOYz6TtxMQJqhN8/LewdBPj/VcSAg/9qm', // senha: admin123
-    name: 'Administrador',
-    role: UserRole.ADMIN,
-    isActive: true,
-    emailVerified: true,
-    createdAt: new Date('2024-01-01'),
-    updatedAt: new Date('2024-01-01'),
-    lastLogin: new Date()
-  }
-]
-
 /**
- * Repositório para operações com usuários
+ * Repositório para operações com usuários usando Prisma
  */
 export class UserRepository {
   /**
    * Busca usuário por ID
    */
   async findById(id: string): Promise<User | null> {
-    const user = users.find(u => u.id === id)
-    return user || null
+    const user = await prisma.user.findUnique({
+      where: { id }
+    })
+
+    if (!user) return null
+
+    return this.mapPrismaUserToUser(user)
   }
 
   /**
    * Busca usuário por email
    */
   async findByEmail(email: string): Promise<User | null> {
-    const user = users.find(u => u.email.toLowerCase() === email.toLowerCase())
-    return user || null
+    const user = await prisma.user.findUnique({
+      where: { email: email.toLowerCase() }
+    })
+
+    if (!user) return null
+
+    return this.mapPrismaUserToUser(user)
   }
 
   /**
    * Cria um novo usuário
    */
   async create(userData: CreateUserData): Promise<User> {
-    const newUser: User = {
-      id: generateId(),
-      email: userData.email.toLowerCase(),
-      password: userData.password,
-      name: userData.name,
-      role: userData.role || UserRole.USER,
-      isActive: true,
-      emailVerified: false,
-      createdAt: new Date(),
-      updatedAt: new Date()
-    }
+    const newUser = await prisma.user.create({
+      data: {
+        email: userData.email.toLowerCase(),
+        password: userData.password,
+        name: userData.name,
+        role: userData.role || UserRole.USER,
+        isActive: true
+      }
+    })
 
-    users.push(newUser)
-    return newUser
+    return this.mapPrismaUserToUser(newUser)
   }
 
   /**
    * Atualiza um usuário
    */
   async update(id: string, updateData: UpdateUserData): Promise<User | null> {
-    const userIndex = users.findIndex(u => u.id === id)
-    
-    if (userIndex === -1) {
+    try {
+      const updatedUser = await prisma.user.update({
+        where: { id },
+        data: {
+          ...updateData,
+          updatedAt: new Date()
+        }
+      })
+
+      return this.mapPrismaUserToUser(updatedUser)
+    } catch (error) {
       return null
     }
-
-    const updatedUser = {
-      ...users[userIndex],
-      ...updateData,
-      updatedAt: new Date()
-    }
-
-    users[userIndex] = updatedUser
-    return updatedUser
   }
 
   /**
    * Deleta um usuário
    */
   async delete(id: string): Promise<boolean> {
-    const userIndex = users.findIndex(u => u.id === id)
-    
-    if (userIndex === -1) {
+    try {
+      await prisma.user.delete({
+        where: { id }
+      })
+      return true
+    } catch (error) {
       return false
     }
-
-    users.splice(userIndex, 1)
-    return true
   }
 
   /**
@@ -103,41 +92,42 @@ export class UserRepository {
     limit: number
     totalPages: number
   }> {
-    let filteredUsers = [...users]
+    const where: any = {}
 
     // Aplicar filtros
     if (filters.role) {
-      filteredUsers = filteredUsers.filter(u => u.role === filters.role)
+      where.role = filters.role
     }
 
     if (filters.isActive !== undefined) {
-      filteredUsers = filteredUsers.filter(u => u.isActive === filters.isActive)
-    }
-
-    if (filters.emailVerified !== undefined) {
-      filteredUsers = filteredUsers.filter(u => u.emailVerified === filters.emailVerified)
+      where.isActive = filters.isActive
     }
 
     if (filters.search) {
-      const searchTerm = filters.search.toLowerCase()
-      filteredUsers = filteredUsers.filter(u => 
-        u.name.toLowerCase().includes(searchTerm) ||
-        u.email.toLowerCase().includes(searchTerm)
-      )
+      where.OR = [
+        { name: { contains: filters.search, mode: 'insensitive' } },
+        { email: { contains: filters.search, mode: 'insensitive' } }
+      ]
     }
 
-    const total = filteredUsers.length
     const page = filters.page || 1
     const limit = filters.limit || 10
+    const skip = (page - 1) * limit
+
+    const [users, total] = await Promise.all([
+      prisma.user.findMany({
+        where,
+        skip,
+        take: limit,
+        orderBy: { createdAt: 'desc' }
+      }),
+      prisma.user.count({ where })
+    ])
+
     const totalPages = Math.ceil(total / limit)
 
-    // Aplicar paginação
-    const startIndex = (page - 1) * limit
-    const endIndex = startIndex + limit
-    const paginatedUsers = filteredUsers.slice(startIndex, endIndex)
-
     return {
-      users: paginatedUsers,
+      users: users.map(user => this.mapPrismaUserToUser(user)),
       total,
       page,
       limit,
@@ -149,31 +139,32 @@ export class UserRepository {
    * Conta usuários com filtros
    */
   async count(filters: Partial<UserFilters> = {}): Promise<number> {
-    let filteredUsers = [...users]
+    const where: any = {}
 
     if (filters.role) {
-      filteredUsers = filteredUsers.filter(u => u.role === filters.role)
+      where.role = filters.role
     }
 
     if (filters.isActive !== undefined) {
-      filteredUsers = filteredUsers.filter(u => u.isActive === filters.isActive)
+      where.isActive = filters.isActive
     }
 
-    if (filters.emailVerified !== undefined) {
-      filteredUsers = filteredUsers.filter(u => u.emailVerified === filters.emailVerified)
-    }
-
-    return filteredUsers.length
+    return await prisma.user.count({ where })
   }
 
   /**
    * Verifica se email já existe
    */
   async emailExists(email: string, excludeId?: string): Promise<boolean> {
-    const user = users.find(u => 
-      u.email.toLowerCase() === email.toLowerCase() && 
-      u.id !== excludeId
-    )
+    const where: any = {
+      email: email.toLowerCase()
+    }
+
+    if (excludeId) {
+      where.id = { not: excludeId }
+    }
+
+    const user = await prisma.user.findFirst({ where })
     return !!user
   }
 
@@ -181,84 +172,82 @@ export class UserRepository {
    * Atualiza último login
    */
   async updateLastLogin(id: string): Promise<void> {
-    const userIndex = users.findIndex(u => u.id === id)
-    
-    if (userIndex !== -1) {
-      users[userIndex].lastLogin = new Date()
-      users[userIndex].updatedAt = new Date()
-    }
+    await prisma.user.update({
+      where: { id },
+      data: {
+        updatedAt: new Date()
+      }
+    })
   }
 
   /**
    * Ativa/desativa usuário
    */
   async toggleActive(id: string): Promise<User | null> {
-    const userIndex = users.findIndex(u => u.id === id)
-    
-    if (userIndex === -1) {
+    try {
+      const user = await prisma.user.findUnique({ where: { id } })
+      if (!user) return null
+
+      const updatedUser = await prisma.user.update({
+        where: { id },
+        data: {
+          isActive: !user.isActive,
+          updatedAt: new Date()
+        }
+      })
+
+      return this.mapPrismaUserToUser(updatedUser)
+    } catch (error) {
       return null
     }
-
-    users[userIndex].isActive = !users[userIndex].isActive
-    users[userIndex].updatedAt = new Date()
-    
-    return users[userIndex]
   }
 
   /**
    * Verifica email
    */
   async verifyEmail(id: string): Promise<User | null> {
-    const userIndex = users.findIndex(u => u.id === id)
-    
-    if (userIndex === -1) {
+    try {
+      const updatedUser = await prisma.user.update({
+        where: { id },
+        data: {
+          updatedAt: new Date()
+        }
+      })
+
+      return this.mapPrismaUserToUser(updatedUser)
+    } catch (error) {
       return null
     }
-
-    users[userIndex].emailVerified = true
-    users[userIndex].updatedAt = new Date()
-    
-    return users[userIndex]
   }
 
   /**
    * Operações em lote
    */
   async bulkUpdate(userIds: string[], updateData: Partial<UpdateUserData>): Promise<number> {
-    let updatedCount = 0
-
-    for (const userId of userIds) {
-      const userIndex = users.findIndex(u => u.id === userId)
-      
-      if (userIndex !== -1) {
-        users[userIndex] = {
-          ...users[userIndex],
-          ...updateData,
-          updatedAt: new Date()
-        }
-        updatedCount++
+    const result = await prisma.user.updateMany({
+      where: {
+        id: { in: userIds }
+      },
+      data: {
+        ...updateData,
+        updatedAt: new Date()
       }
-    }
+    })
 
-    return updatedCount
+    return result.count
   }
 
   /**
    * Deleta múltiplos usuários
    */
   async bulkDelete(userIds: string[]): Promise<number> {
-    let deletedCount = 0
-
-    for (const userId of userIds) {
-      const userIndex = users.findIndex(u => u.id === userId)
-      
-      if (userIndex !== -1) {
-        users.splice(userIndex, 1)
-        deletedCount++
+    const result = await prisma.user.deleteMany({
+      where: {
+        id: { in: userIds }
       }
-    }
+    })
 
-    return deletedCount
+    return result.count
   }
 
   /**
@@ -272,16 +261,22 @@ export class UserRepository {
     unverified: number
     byRole: Record<UserRole, number>
   }> {
-    const total = users.length
-    const active = users.filter(u => u.isActive).length
+    const [total, active, adminCount, moderatorCount, userCount] = await Promise.all([
+      prisma.user.count(),
+      prisma.user.count({ where: { isActive: true } }),
+      prisma.user.count({ where: { role: UserRole.ADMIN } }),
+      prisma.user.count({ where: { role: UserRole.MODERATOR } }),
+      prisma.user.count({ where: { role: UserRole.USER } })
+    ])
+
     const inactive = total - active
-    const verified = users.filter(u => u.emailVerified).length
+    const verified = 0 // SQLite não tem campo emailVerified no schema atual
     const unverified = total - verified
 
     const byRole = {
-      [UserRole.ADMIN]: users.filter(u => u.role === UserRole.ADMIN).length,
-      [UserRole.MODERATOR]: users.filter(u => u.role === UserRole.MODERATOR).length,
-      [UserRole.USER]: users.filter(u => u.role === UserRole.USER).length
+      [UserRole.ADMIN]: adminCount,
+      [UserRole.MODERATOR]: moderatorCount,
+      [UserRole.USER]: userCount
     }
 
     return {
@@ -291,6 +286,25 @@ export class UserRepository {
       verified,
       unverified,
       byRole
+    }
+  }
+
+  /**
+   * Mapeia usuário do Prisma para o tipo User da aplicação
+   */
+  private mapPrismaUserToUser(prismaUser: any): User {
+    return {
+      id: prismaUser.id,
+      email: prismaUser.email,
+      password: prismaUser.password,
+      name: prismaUser.name,
+      role: prismaUser.role as UserRole,
+      isActive: prismaUser.isActive,
+      emailVerified: false, // Campo não existe no schema atual
+      settings: prismaUser.settings ? JSON.parse(prismaUser.settings) : undefined,
+      createdAt: prismaUser.createdAt,
+      updatedAt: prismaUser.updatedAt,
+      lastLogin: prismaUser.updatedAt // Usando updatedAt como lastLogin temporariamente
     }
   }
 }
