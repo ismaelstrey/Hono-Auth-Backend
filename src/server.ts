@@ -8,7 +8,7 @@ import { swaggerUI } from '@hono/swagger-ui'
 import 'dotenv/config'
 
 // Importar middlewares
-import { rateLimitPublic } from '@/middlewares/rateLimiter'
+import { rateLimitPublic, clearRateLimitRecords } from '@/middlewares/rateLimiter'
 import { errorHandler } from '@/middlewares/errorHandler'
 
 // Importar rotas
@@ -163,6 +163,11 @@ const port = config.server.port
 
 // Inicializar conexão com banco de dados
 await connectDatabase()
+
+// Limpar registros de rate limiting em desenvolvimento
+if (env.NODE_ENV === 'development') {
+  clearRateLimitRecords()
+}
 
 console.log(`🚀 Servidor rodando em ${config.server.url}`)
 console.log(`📝 Ambiente: ${env.NODE_ENV}`)

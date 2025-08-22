@@ -7,6 +7,14 @@ import type { RateLimitConfig } from '@/types'
 const requestCounts = new Map<string, { count: number; resetTime: number }>()
 
 /**
+ * Função para limpar todos os registros de rate limiting (útil para desenvolvimento)
+ */
+export const clearRateLimitRecords = () => {
+  requestCounts.clear()
+  console.log('🧹 Rate limit records cleared')
+}
+
+/**
  * Configurações padrão de rate limiting
  */
 const defaultConfig: RateLimitConfig = {
