@@ -2,6 +2,7 @@ import { userRepository } from '@/repositories/userRepository'
 import { hashPassword, comparePassword } from '@/utils/password'
 import { generateToken, generateRefreshToken, verifyRefreshToken, generateResetToken, verifyResetToken } from '@/utils/jwt'
 import { sanitizeUser } from '@/utils/helpers'
+import { LogService } from '@/services/logService'
 import type { 
   CreateUserData, 
   AuthResponse, 
@@ -15,86 +16,257 @@ import type {
  * Serviço de autenticação
  */
 export class AuthService {
+  private logService: LogService
+
+  constructor() {
+    this.logService = new LogService()
+  }
+
   /**
    * Registra um novo usuário
    */
-  async register(userData: CreateUserData): Promise<AuthResponse> {
-    // Verifica se o email já existe
-    const existingUser = await userRepository.findByEmail(userData.email)
-    if (existingUser) {
-      throw new Error('Email já está em uso')
-    }
+  async register(userData: CreateUserData, ip?: string): Promise<AuthResponse> {
+    const startTime = Date.now()
+    
+    try {
+      // Verifica se o email já existe
+      const existingUser = await userRepository.findByEmail(userData.email)
+      if (existingUser) {
+        // Log de tentativa de registro com email existente
+        await this.logService.warn('Tentativa de registro com email já existente', {
+          email: userData.email,
+          duration: Date.now() - startTime
+        }, {
+          action: 'REGISTER_FAILED_EMAIL_EXISTS',
+          resource: 'auth',
+          method: 'POST',
+          path: '/api/auth/register',
+          ip: ip || 'unknown'
+        })
+        throw new Error('Email já está em uso')
+      }
 
-    // Hash da senha
-    const hashedPassword = await hashPassword(userData.password)
+      // Hash da senha
+      const hashedPassword = await hashPassword(userData.password)
 
-    // Cria o usuário
-    const user = await userRepository.create({
-      ...userData,
-      password: hashedPassword
-    })
+      // Cria o usuário
+      const user = await userRepository.create({
+        ...userData,
+        password: hashedPassword
+      })
 
-    // Gera tokens
-    const token = generateToken({
-      userId: user.id,
-      email: user.email,
-      role: user.role
-    })
+      // Gera token de verificação de email (válido por 24 horas)
+      const verificationToken = generateResetToken()
+      const expiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000) // 24 horas
 
-    const refreshToken = generateRefreshToken({
-      userId: user.id,
-      email: user.email,
-      role: user.role
-    })
+      // Salva o token de verificação no banco de dados
+      await userRepository.setEmailVerificationToken(user.id, verificationToken, expiresAt)
 
-    return {
-      user: sanitizeUser(user),
-      token,
-      refreshToken
+      // Log para desenvolvimento (em produção, enviar email)
+      console.log(`Token de verificação para ${user.email}: ${verificationToken}`)
+      console.log(`Link de verificação: ${process.env.FRONTEND_URL}/verify-email?token=${verificationToken}`)
+
+      // Em produção, você enviaria um email aqui
+      // await emailService.sendVerificationEmail(user.email, verificationToken)
+
+      // Log de registro bem-sucedido
+      await this.logService.info('Usuário registrado com sucesso', {
+        userId: user.id,
+        email: user.email,
+        name: user.name,
+        role: user.role,
+        duration: Date.now() - startTime
+      }, {
+        userId: user.id,
+        action: 'REGISTER_SUCCESS',
+        resource: 'auth',
+        method: 'POST',
+        path: '/api/auth/register',
+        ip: ip || 'unknown'
+      })
+
+      // Gera tokens de autenticação
+      const token = generateToken({
+        userId: user.id,
+        email: user.email,
+        role: user.role
+      })
+
+      const refreshToken = generateRefreshToken({
+        userId: user.id,
+        email: user.email,
+        role: user.role
+      })
+
+      return {
+        user: sanitizeUser(user),
+        token,
+        refreshToken
+      }
+    } catch (error) {
+      // Log de erro geral no registro
+      if (error instanceof Error && !error.message.includes('Email já está em uso')) {
+        await this.logService.error('Erro interno durante registro', {
+          email: userData.email,
+          error: error.message,
+          duration: Date.now() - startTime
+        }, {
+          action: 'REGISTER_ERROR',
+          resource: 'auth',
+          method: 'POST',
+          path: '/api/auth/register',
+          ip: ip || 'unknown'
+        })
+      }
+      throw error
     }
   }
 
   /**
    * Realiza login do usuário
    */
-  async login(loginData: LoginData): Promise<AuthResponse> {
-    // Busca o usuário pelo email
-    const user = await userRepository.findByEmail(loginData.email)
-    if (!user) {
-      throw new Error('Credenciais inválidas')
-    }
+  async login(loginData: LoginData, ip?: string): Promise<AuthResponse> {
+    const startTime = Date.now()
+    
+    try {
+      // Busca o usuário pelo email
+      const user = await userRepository.findByEmail(loginData.email)
+      if (!user) {
+        // Log de tentativa de login com email inexistente
+        await this.logService.warn('Tentativa de login com email inexistente', {
+          email: loginData.email,
+          duration: Date.now() - startTime
+        }, {
+          action: 'LOGIN_FAILED',
+          resource: 'auth',
+          method: 'POST',
+          path: '/api/auth/login',
+          ip: ip || 'unknown'
+        })
+        throw new Error('Credenciais inválidas')
+      }
 
-    // Verifica se a conta está ativa
-    if (!user.isActive) {
-      throw new Error('Conta desativada. Entre em contato com o suporte.')
-    }
+      // Verifica se a conta está ativa
+      if (!user.isActive) {
+        // Log de tentativa de login com conta inativa
+        await this.logService.warn('Tentativa de login com conta inativa', {
+          userId: user.id,
+          email: user.email,
+          duration: Date.now() - startTime
+        }, {
+          userId: user.id,
+          action: 'LOGIN_FAILED_INACTIVE',
+          resource: 'auth',
+          method: 'POST',
+          path: '/api/auth/login',
+          ip: ip || 'unknown'
+        })
+        throw new Error('Conta desativada. Entre em contato com o suporte.')
+      }
 
-    // Verifica a senha
-    const isPasswordValid = await comparePassword(loginData.password, user.password)
-    if (!isPasswordValid) {
-      throw new Error('Credenciais inválidas')
-    }
+      // Verifica se a conta está bloqueada
+      if (user.lockedUntil && user.lockedUntil > new Date()) {
+        const remainingTime = Math.ceil((user.lockedUntil.getTime() - Date.now()) / (1000 * 60))
+        // Log de tentativa de login com conta bloqueada
+        await this.logService.warn('Tentativa de login com conta bloqueada', {
+          userId: user.id,
+          email: user.email,
+          lockedUntil: user.lockedUntil,
+          remainingMinutes: remainingTime,
+          duration: Date.now() - startTime
+        }, {
+          userId: user.id,
+          action: 'LOGIN_FAILED_LOCKED',
+          resource: 'auth',
+          method: 'POST',
+          path: '/api/auth/login',
+          ip: ip || 'unknown'
+        })
+        throw new Error(`Conta bloqueada devido a muitas tentativas de login falhadas. Tente novamente em ${remainingTime} minutos.`)
+      }
 
-    // Atualiza último login
-    await userRepository.updateLastLogin(user.id)
+      // Verifica a senha
+      const isPasswordValid = await comparePassword(loginData.password, user.password)
+      if (!isPasswordValid) {
+        // Log de tentativa de login com senha incorreta
+        await this.logService.warn('Tentativa de login com senha incorreta', {
+          userId: user.id,
+          email: user.email,
+          failedAttempts: (user.failedLoginAttempts || 0) + 1,
+          duration: Date.now() - startTime
+        }, {
+          userId: user.id,
+          action: 'LOGIN_FAILED_PASSWORD',
+          resource: 'auth',
+          method: 'POST',
+          path: '/api/auth/login',
+          ip: ip || 'unknown'
+        })
+        
+        // Incrementa tentativas falhadas
+        await this.handleFailedLogin(user.id, user.failedLoginAttempts || 0)
+        throw new Error('Credenciais inválidas')
+      }
 
-    // Gera tokens
-    const token = generateToken({
-      userId: user.id,
-      email: user.email,
-      role: user.role
-    })
+      // Login bem-sucedido - limpa tentativas falhadas
+      if (user.failedLoginAttempts > 0 || user.lockedUntil) {
+        await userRepository.clearFailedLoginAttempts(user.id)
+      }
 
-    const refreshToken = generateRefreshToken({
-      userId: user.id,
-      email: user.email,
-      role: user.role
-    })
+      // Atualiza último login
+      await userRepository.updateLastLogin(user.id)
 
-    return {
-      user: sanitizeUser(user),
-      token,
-      refreshToken
+      // Log de login bem-sucedido
+      await this.logService.info('Login realizado com sucesso', {
+        userId: user.id,
+        email: user.email,
+        role: user.role,
+        duration: Date.now() - startTime
+      }, {
+        userId: user.id,
+        action: 'LOGIN_SUCCESS',
+        resource: 'auth',
+        method: 'POST',
+        path: '/api/auth/login',
+        ip: ip || 'unknown'
+      })
+
+      // Gera tokens
+      const token = generateToken({
+        userId: user.id,
+        email: user.email,
+        role: user.role
+      })
+
+      const refreshToken = generateRefreshToken({
+        userId: user.id,
+        email: user.email,
+        role: user.role
+      })
+
+      return {
+        user: sanitizeUser(user),
+        token,
+        refreshToken
+      }
+    } catch (error) {
+      // Log de erro geral no login
+      if (error instanceof Error && !error.message.includes('Credenciais inválidas') && 
+          !error.message.includes('Conta desativada') && 
+          !error.message.includes('Conta bloqueada')) {
+        await this.logService.error('Erro interno durante login', {
+          email: loginData.email,
+          error: error.message,
+          duration: Date.now() - startTime
+        }, {
+          action: 'LOGIN_ERROR',
+          resource: 'auth',
+          method: 'POST',
+          path: '/api/auth/login',
+          ip: ip || 'unknown'
+        })
+      }
+      throw error
     }
   }
 
@@ -137,49 +309,159 @@ export class AuthService {
   /**
    * Inicia processo de recuperação de senha
    */
-  async forgotPassword(data: ForgotPasswordData): Promise<{ message: string }> {
-    const user = await userRepository.findByEmail(data.email)
+  async forgotPassword(data: ForgotPasswordData, ip?: string): Promise<{ message: string }> {
+    const startTime = Date.now()
     
-    // Por segurança, sempre retorna sucesso mesmo se o email não existir
-    if (!user) {
+    try {
+      const user = await userRepository.findByEmail(data.email)
+      
+      // Por segurança, sempre retorna sucesso mesmo se o email não existir
+      if (!user) {
+        // Log de tentativa de reset com email inexistente
+        await this.logService.warn('Tentativa de reset de senha com email inexistente', {
+          email: data.email,
+          duration: Date.now() - startTime
+        }, {
+          action: 'PASSWORD_RESET_FAILED_EMAIL_NOT_FOUND',
+          resource: 'auth',
+          method: 'POST',
+          path: '/api/auth/forgot-password',
+          ip: ip || 'unknown'
+        })
+        
+        return {
+          message: 'Se o email existir em nossa base, você receberá instruções para redefinir sua senha.'
+        }
+      }
+
+      // Gera token de reset (válido por 1 hora)
+      const resetToken = generateResetToken()
+      const expiresAt = new Date(Date.now() + 60 * 60 * 1000) // 1 hora
+
+      // Salva o token no banco de dados
+      const tokenSaved = await userRepository.setPasswordResetToken(user.email, resetToken, expiresAt)
+      
+      if (!tokenSaved) {
+        throw new Error('Erro interno. Tente novamente mais tarde.')
+      }
+
+      // Log de solicitação de reset bem-sucedida
+      await this.logService.info('Solicitação de reset de senha realizada', {
+        userId: user.id,
+        email: user.email,
+        tokenExpiry: expiresAt,
+        duration: Date.now() - startTime
+      }, {
+        userId: user.id,
+        action: 'PASSWORD_RESET_REQUESTED',
+        resource: 'auth',
+        method: 'POST',
+        path: '/api/auth/forgot-password',
+        ip: ip || 'unknown'
+      })
+
+      // Log para desenvolvimento (em produção, enviar email)
+      console.log(`Token de reset para ${user.email}: ${resetToken}`)
+      console.log(`Link de reset: ${process.env.FRONTEND_URL}/reset-password?token=${resetToken}`)
+
+      // Em produção, você enviaria um email aqui
+      // await emailService.sendPasswordResetEmail(user.email, resetToken)
+
       return {
         message: 'Se o email existir em nossa base, você receberá instruções para redefinir sua senha.'
       }
-    }
-
-    // Gera token de reset
-    const resetToken = generateResetToken()
-
-    // Aqui você salvaria o token no banco de dados associado ao usuário
-    // e enviaria por email. Por simplicidade, vamos apenas logar
-    console.log(`Token de reset para ${user.email}: ${resetToken}`)
-    console.log(`Link de reset: ${process.env.FRONTEND_URL}/reset-password?token=${resetToken}`)
-
-    // Em produção, você enviaria um email aqui
-    // await emailService.sendPasswordResetEmail(user.email, resetToken)
-
-    return {
-      message: 'Se o email existir em nossa base, você receberá instruções para redefinir sua senha.'
+    } catch (error) {
+      // Log de erro geral no forgot password
+      if (error instanceof Error && !error.message.includes('Erro interno')) {
+        await this.logService.error('Erro interno durante solicitação de reset', {
+          email: data.email,
+          error: error.message,
+          duration: Date.now() - startTime
+        }, {
+          action: 'PASSWORD_RESET_ERROR',
+          resource: 'auth',
+          method: 'POST',
+          path: '/api/auth/forgot-password',
+          ip: ip || 'unknown'
+        })
+      }
+      throw error
     }
   }
 
   /**
    * Redefine a senha usando token de reset
    */
-  async resetPassword(data: ResetPasswordData): Promise<{ message: string }> {
-    // Verifica o token de reset
-    const isValidToken = verifyResetToken(data.token)
-    if (!isValidToken) {
-      throw new Error('Token de reset inválido ou expirado')
-    }
-
-    // Em uma implementação real, você buscaria o usuário pelo token
-    // Por simplicidade, vamos assumir que o token contém o email
-    // const user = await userRepository.findByResetToken(data.token)
+  async resetPassword(data: ResetPasswordData, ip?: string): Promise<{ message: string }> {
+    const startTime = Date.now()
     
-    // Para este exemplo, vamos usar um usuário fictício
-    // Em produção, implemente a lógica de tokens de reset no banco
-    throw new Error('Funcionalidade de reset de senha requer implementação completa com banco de dados')
+    try {
+      // Busca usuário pelo token de reset
+      const user = await userRepository.findByPasswordResetToken(data.token)
+      
+      if (!user) {
+        // Log de tentativa de reset com token inválido
+        await this.logService.warn('Tentativa de reset com token inválido', {
+          token: data.token.substring(0, 10) + '...', // Log apenas parte do token por segurança
+          duration: Date.now() - startTime
+        }, {
+          action: 'PASSWORD_RESET_FAILED_INVALID_TOKEN',
+          resource: 'auth',
+          method: 'POST',
+          path: '/api/auth/reset-password',
+          ip: ip || 'unknown'
+        })
+        throw new Error('Token de reset inválido ou expirado')
+      }
+
+      // Hash da nova senha
+      const hashedPassword = await hashPassword(data.password)
+
+      // Atualiza a senha do usuário
+      const updatedUser = await userRepository.update(user.id, {
+        password: hashedPassword
+      })
+
+      if (!updatedUser) {
+        throw new Error('Erro ao atualizar senha. Tente novamente.')
+      }
+
+      // Limpa o token de reset
+      await userRepository.clearPasswordResetToken(user.id)
+
+      // Log de reset de senha bem-sucedido
+      await this.logService.info('Senha redefinida com sucesso', {
+        userId: user.id,
+        email: user.email,
+        duration: Date.now() - startTime
+      }, {
+        userId: user.id,
+        action: 'PASSWORD_RESET_SUCCESS',
+        resource: 'auth',
+        method: 'POST',
+        path: '/api/auth/reset-password',
+        ip: ip || 'unknown'
+      })
+
+      return {
+        message: 'Senha redefinida com sucesso. Você já pode fazer login com sua nova senha.'
+      }
+    } catch (error) {
+      // Log de erro geral no reset password
+      if (error instanceof Error && !error.message.includes('Token de reset inválido')) {
+        await this.logService.error('Erro interno durante reset de senha', {
+          error: error.message,
+          duration: Date.now() - startTime
+        }, {
+          action: 'PASSWORD_RESET_ERROR',
+          resource: 'auth',
+          method: 'POST',
+          path: '/api/auth/reset-password',
+          ip: ip || 'unknown'
+        })
+      }
+      throw error
+    }
   }
 
   /**
@@ -218,19 +500,30 @@ export class AuthService {
   /**
    * Verifica email do usuário
    */
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  async verifyEmail(_token: string): Promise<{ message: string }> {
-    // Em uma implementação real, você verificaria o token e encontraria o usuário
-    // Por simplicidade, vamos assumir que funciona
+  async verifyEmail(token: string): Promise<{ message: string }> {
+    // Busca usuário pelo token de verificação
+    const user = await userRepository.findByEmailVerificationToken(token)
     
-    // const user = await userRepository.findByVerificationToken(_token)
-    // if (!user) {
-    //   throw new Error('Token de verificação inválido')
-    // }
+    if (!user) {
+      throw new Error('Token de verificação inválido ou expirado')
+    }
+
+    if (user.emailVerified) {
+      return {
+        message: 'Email já foi verificado anteriormente.'
+      }
+    }
     
-    // await userRepository.verifyEmail(user.id)
+    // Verifica o email do usuário
+    const verifiedUser = await userRepository.verifyEmail(user.id)
     
-    throw new Error('Funcionalidade de verificação de email requer implementação completa com banco de dados')
+    if (!verifiedUser) {
+      throw new Error('Erro ao verificar email. Tente novamente.')
+    }
+    
+    return {
+      message: 'Email verificado com sucesso! Sua conta está agora ativa.'
+    }
   }
 
   /**
@@ -252,12 +545,23 @@ export class AuthService {
       }
     }
 
-    // Gera novo token de verificação
+    // Gera novo token de verificação (válido por 24 horas)
     const verificationToken = generateResetToken()
+    const expiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000) // 24 horas
 
-    // Aqui você salvaria o token e enviaria o email
+    // Salva o token no banco de dados
+    const tokenSaved = await userRepository.setEmailVerificationToken(user.id, verificationToken, expiresAt)
+    
+    if (!tokenSaved) {
+      throw new Error('Erro interno. Tente novamente mais tarde.')
+    }
+
+    // Log para desenvolvimento (em produção, enviar email)
     console.log(`Token de verificação para ${user.email}: ${verificationToken}`)
     console.log(`Link de verificação: ${process.env.FRONTEND_URL}/verify-email?token=${verificationToken}`)
+
+    // Em produção, você enviaria um email aqui
+    // await emailService.sendVerificationEmail(user.email, verificationToken)
 
     return {
       message: 'Se o email existir e não estiver verificado, um novo email de verificação será enviado.'
@@ -274,6 +578,25 @@ export class AuthService {
     }
 
     return sanitizeUser(user)
+  }
+
+  /**
+   * Trata tentativas de login falhadas
+   */
+  private async handleFailedLogin(userId: string, currentAttempts: number): Promise<void> {
+    const maxAttempts = 5 // Máximo de 5 tentativas
+    const lockoutDuration = 30 * 60 * 1000 // 30 minutos em millisegundos
+    
+    const newAttempts = currentAttempts + 1
+    
+    if (newAttempts >= maxAttempts) {
+      // Bloqueia a conta por 30 minutos
+      const lockedUntil = new Date(Date.now() + lockoutDuration)
+      await userRepository.lockAccount(userId, lockedUntil)
+    } else {
+      // Apenas incrementa as tentativas falhadas
+      await userRepository.incrementFailedLoginAttempts(userId, newAttempts)
+    }
   }
 
   /**

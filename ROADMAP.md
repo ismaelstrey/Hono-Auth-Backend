@@ -60,18 +60,24 @@
   - [x] `POST /api/dev/clear-rate-limit-ip/:ip` - Limpar rate limit por IP
   - [x] `POST /api/dev/clear-rate-limit-pattern/:pattern` - Limpar rate limit por padrão
 
+### 🗄️ Integração Prisma
+- [x] Instalar Prisma CLI e cliente Prisma com SQLite
+- [x] Criar schema.prisma com modelo User e configuração SQLite
+- [x] Executar primeira migração do Prisma para criar tabelas
+- [x] Configurar cliente Prisma e conexão com banco
+- [x] Atualizar userRepository.ts para usar Prisma ao invés de dados em memória
+- [x] Atualizar authService.ts e userService.ts para trabalhar com Prisma
+- [x] Testar todas as rotas com integração Prisma funcionando
+
 ---
 
 ## 🔄 Tarefas em Andamento
 
-### 🗄️ Integração Prisma
-- [x] ~~Instalar Prisma CLI e cliente Prisma com SQLite~~
-- [x] ~~Criar schema.prisma com modelo User e configuração SQLite~~
-- [x] ~~Executar primeira migração do Prisma para criar tabelas~~
-- [🔄] **Configurar cliente Prisma e conexão com banco** (em progresso)
-- [ ] Atualizar userRepository.ts para usar Prisma ao invés de dados em memória
-- [ ] Atualizar authService.ts e userService.ts para trabalhar com Prisma
-- [ ] Testar todas as rotas com integração Prisma funcionando
+### 🔐 Melhorias na Autenticação
+- [🔄] **Implementar verificação de email** (próxima etapa)
+- [ ] Sistema de recuperação de senha
+- [ ] Bloqueio de conta após tentativas falhadas
+- [ ] Logs de atividade de login
 
 ---
 

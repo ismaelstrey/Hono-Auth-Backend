@@ -7,6 +7,8 @@ export interface User {
   role: UserRole
   isActive: boolean
   emailVerified: boolean
+  failedLoginAttempts?: number
+  lockedUntil?: Date
   settings?: any
   createdAt: Date
   updatedAt: Date

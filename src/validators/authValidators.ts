@@ -78,7 +78,7 @@ export const resetPasswordSchema = z.object({
   })
     .min(1, 'Token é obrigatório'),
   
-  newPassword: z.string({
+  password: z.string({
     required_error: 'Nova senha é obrigatória'
   })
     .min(8, 'Senha deve ter pelo menos 8 caracteres')
@@ -91,7 +91,7 @@ export const resetPasswordSchema = z.object({
   confirmPassword: z.string({
     required_error: 'Confirmação de senha é obrigatória'
   })
-}).refine((data) => data.newPassword === data.confirmPassword, {
+}).refine((data) => data.password === data.confirmPassword, {
   message: 'Senhas não coincidem',
   path: ['confirmPassword']
 })

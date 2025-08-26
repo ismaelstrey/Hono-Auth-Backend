@@ -9,7 +9,10 @@ import {
   loginSchema,
   refreshTokenSchema,
   forgotPasswordSchema,
-  resetPasswordSchema
+  resetPasswordSchema,
+  verifyEmailSchema,
+  resendVerificationSchema,
+  changePasswordSchema
 } from '@/validators/authValidators'
 
 /**
@@ -58,12 +61,15 @@ authRoutes.post(
 
 authRoutes.post(
   '/verify-email',
+  rateLimitAuth,
+  zValidator('json', verifyEmailSchema),
   AuthController.handleVerifyEmail
 )
 
 authRoutes.post(
   '/resend-verification',
   rateLimitAuth,
+  zValidator('json', resendVerificationSchema),
   AuthController.handleResendVerification
 )
 
@@ -89,6 +95,7 @@ authRoutes.get('/profile', AuthController.getProfile)
 // Alterar senha
 authRoutes.post(
   '/change-password',
+  zValidator('json', changePasswordSchema),
   AuthController.handleChangePassword
 )
 

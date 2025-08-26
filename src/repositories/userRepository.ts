@@ -210,6 +210,9 @@ export class UserRepository {
       const updatedUser = await prisma.user.update({
         where: { id },
         data: {
+          emailVerified: true,
+          emailVerificationToken: null,
+          emailVerificationExpires: null,
           updatedAt: new Date()
         }
       })
@@ -217,6 +220,159 @@ export class UserRepository {
       return this.mapPrismaUserToUser(updatedUser)
     } catch (error) {
       return null
+    }
+  }
+
+  /**
+   * Define token de verificação de email
+   */
+  async setEmailVerificationToken(id: string, token: string, expiresAt: Date): Promise<boolean> {
+    try {
+      await prisma.user.update({
+        where: { id },
+        data: {
+          emailVerificationToken: token,
+          emailVerificationExpires: expiresAt,
+          updatedAt: new Date()
+        }
+      })
+      return true
+    } catch (error) {
+      return false
+    }
+  }
+
+  /**
+   * Busca usuário por token de verificação de email
+   */
+  async findByEmailVerificationToken(token: string): Promise<User | null> {
+    try {
+      const user = await prisma.user.findFirst({
+        where: {
+          emailVerificationToken: token,
+          emailVerificationExpires: {
+            gt: new Date()
+          }
+        }
+      })
+
+      return user ? this.mapPrismaUserToUser(user) : null
+    } catch (error) {
+      return null
+    }
+  }
+
+  /**
+   * Define token de reset de senha
+   */
+  async setPasswordResetToken(email: string, token: string, expiresAt: Date): Promise<boolean> {
+    try {
+      await prisma.user.update({
+        where: { email: email.toLowerCase() },
+        data: {
+          passwordResetToken: token,
+          passwordResetExpires: expiresAt,
+          updatedAt: new Date()
+        }
+      })
+      return true
+    } catch (error) {
+      return false
+    }
+  }
+
+  /**
+   * Busca usuário por token de reset de senha
+   */
+  async findByPasswordResetToken(token: string): Promise<User | null> {
+    try {
+      const user = await prisma.user.findFirst({
+        where: {
+          passwordResetToken: token,
+          passwordResetExpires: {
+            gt: new Date()
+          }
+        }
+      })
+
+      return user ? this.mapPrismaUserToUser(user) : null
+    } catch (error) {
+      return null
+    }
+  }
+
+  /**
+   * Limpa token de reset de senha
+   */
+  async clearPasswordResetToken(id: string): Promise<boolean> {
+    try {
+      await prisma.user.update({
+        where: { id },
+        data: {
+          passwordResetToken: null,
+          passwordResetExpires: null,
+          updatedAt: new Date()
+        }
+      })
+      return true
+    } catch (error) {
+      return false
+    }
+  }
+
+  /**
+   * Incrementa tentativas de login falhadas
+   */
+  async incrementFailedLoginAttempts(id: string, attempts: number): Promise<boolean> {
+    try {
+      await prisma.user.update({
+        where: { id },
+        data: {
+          failedLoginAttempts: attempts,
+          updatedAt: new Date()
+        }
+      })
+      return true
+    } catch (error) {
+      return false
+    }
+  }
+
+  /**
+   * Bloqueia conta do usuário
+   */
+  async lockAccount(id: string, lockedUntil: Date): Promise<boolean> {
+    try {
+      await prisma.user.update({
+        where: { id },
+        data: {
+          failedLoginAttempts: 0,
+          lockedUntil: lockedUntil,
+          updatedAt: new Date()
+        }
+      })
+      return true
+    } catch (error) {
+      return false
+    }
+  }
+
+  /**
+   * Limpa tentativas de login falhadas e desbloqueio
+   */
+  async clearFailedLoginAttempts(id: string): Promise<boolean> {
+    try {
+      await prisma.user.update({
+        where: { id },
+        data: {
+          failedLoginAttempts: 0,
+          lockedUntil: null,
+          updatedAt: new Date()
+        }
+      })
+      return true
+    } catch (error) {
+      return false
     }
   }
 
@@ -300,7 +456,9 @@ export class UserRepository {
       name: prismaUser.name,
       role: prismaUser.role as UserRole,
       isActive: prismaUser.isActive,
-      emailVerified: false, // Campo não existe no schema atual
+      emailVerified: prismaUser.emailVerified || false,
+      failedLoginAttempts: prismaUser.failedLoginAttempts || 0,
+      lockedUntil: prismaUser.lockedUntil,
       settings: prismaUser.settings ? JSON.parse(prismaUser.settings) : undefined,
       createdAt: prismaUser.createdAt,
       updatedAt: prismaUser.updatedAt,
