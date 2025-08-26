@@ -2,6 +2,7 @@ import { createMiddleware } from 'hono/factory'
 import type { Context } from 'hono'
 import { verifyToken, extractTokenFromHeader } from '@/utils/jwt'
 import { errorResponse } from '@/utils/helpers'
+import { emailService } from '@/services/emailService'
 import type { JWTPayload } from '@/types'
 import { UserRole } from '@/types'
 
@@ -131,12 +132,12 @@ export const requireVerifiedEmail = createMiddleware(async (c: Context, next) =>
     return c.json(errorResponse('Usuário não autenticado'), 401)
   }
   
-  // Aqui você pode adicionar lógica para verificar se o email foi verificado
-  // Por exemplo, consultando o banco de dados
-  // const userRecord = await getUserById(user.userId)
-  // if (!userRecord.emailVerified) {
-  //   return c.json(errorResponse('Email não verificado'), 403)
-  // }
+  // Verifica se o email foi verificado
+  const isEmailVerified = await emailService.isEmailVerified(user.userId)
+  
+  if (!isEmailVerified) {
+    return c.json(errorResponse('Email não verificado. Verifique seu email antes de continuar.'), 403)
+  }
   
   await next()
 })

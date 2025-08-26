@@ -1,5 +1,6 @@
 # 🗺️ Roadmap - Backend Hono API
 
+
 ## 📋 Visão Geral do Projeto
 
 **Backend Hono** é uma API robusta de autenticação e gerenciamento de usuários construída com Hono.js, TypeScript e Prisma, seguindo as melhores práticas de desenvolvimento e arquitetura em camadas.
@@ -22,11 +23,18 @@
 - [x] Migrações iniciais do Prisma
 - [x] Cliente Prisma configurado
 
-### 🔐 Sistema de Autenticação
+### 🔐 Melhorias na Autenticação
 - [x] Middleware de autenticação JWT
 - [x] Utilitários para hash de senhas (bcrypt)
 - [x] Geração e validação de tokens JWT
 - [x] Sistema de refresh tokens
+- [x] **Sistema de verificação de email completo**
+  - [x] Schema do banco com campos de verificação
+  - [x] Serviço de email com geração de tokens
+  - [x] Endpoints de verificação e reenvio
+  - [x] Middleware de proteção para emails não verificados
+  - [x] Integração no fluxo de registro
+  - [x] Documentação Swagger atualizada
 
 ### 🛣️ Endpoints da API
 - [x] **POST** `/api/auth/register` - Registro de usuários
@@ -73,11 +81,13 @@
 
 ## 🔄 Tarefas em Andamento
 
-### 🔐 Melhorias na Autenticação
-- [🔄] **Implementar verificação de email** (próxima etapa)
-- [ ] Sistema de recuperação de senha
-- [ ] Bloqueio de conta após tentativas falhadas
-- [ ] Logs de atividade de login
+### 🔐 Sistema de Recuperação de Senha
+- [🔄] **Implementar sistema de recuperação de senha** (próxima etapa)
+  - [ ] Endpoint para solicitar reset de senha
+  - [ ] Geração de tokens de reset seguros
+  - [ ] Envio de email com link de reset
+  - [ ] Endpoint para confirmar nova senha
+  - [ ] Validação de tokens com expiração
 
 ---
 
@@ -93,7 +103,7 @@
   - [ ] Testes de integração com banco de dados
 
 - [ ] **Melhorias na Autenticação**
-  - [ ] Implementar verificação de email
+  - [x] Implementar verificação de email ✅
   - [ ] Sistema de recuperação de senha
   - [ ] Bloqueio de conta após tentativas falhadas
   - [ ] Logs de atividade de login

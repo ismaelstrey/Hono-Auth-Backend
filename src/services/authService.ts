@@ -3,6 +3,7 @@ import { hashPassword, comparePassword } from '@/utils/password'
 import { generateToken, generateRefreshToken, verifyRefreshToken, generateResetToken, verifyResetToken } from '@/utils/jwt'
 import { sanitizeUser } from '@/utils/helpers'
 import { LogService } from '@/services/logService'
+import { emailService } from '@/services/emailService'
 import type { 
   CreateUserData, 
   AuthResponse, 
@@ -55,19 +56,22 @@ export class AuthService {
         password: hashedPassword
       })
 
-      // Gera token de verificação de email (válido por 24 horas)
-      const verificationToken = generateResetToken()
-      const expiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000) // 24 horas
+      // Gera token de verificação de email
+      const verificationToken = emailService.generateVerificationToken()
 
       // Salva o token de verificação no banco de dados
-      await userRepository.setEmailVerificationToken(user.id, verificationToken, expiresAt)
+      await emailService.saveVerificationToken(user.id, verificationToken)
 
-      // Log para desenvolvimento (em produção, enviar email)
-      console.log(`Token de verificação para ${user.email}: ${verificationToken}`)
-      console.log(`Link de verificação: ${process.env.FRONTEND_URL}/verify-email?token=${verificationToken}`)
+      // Envia email de verificação
+      const emailResult = await emailService.sendVerificationEmail({
+        email: user.email,
+        name: user.name,
+        token: verificationToken
+      })
 
-      // Em produção, você enviaria um email aqui
-      // await emailService.sendVerificationEmail(user.email, verificationToken)
+      if (!emailResult.success) {
+        console.warn('Falha ao enviar email de verificação:', emailResult.message)
+      }
 
       // Log de registro bem-sucedido
       await this.logService.info('Usuário registrado com sucesso', {
@@ -334,22 +338,27 @@ export class AuthService {
         }
       }
 
-      // Gera token de reset (válido por 1 hora)
-      const resetToken = generateResetToken()
-      const expiresAt = new Date(Date.now() + 60 * 60 * 1000) // 1 hora
-
-      // Salva o token no banco de dados
-      const tokenSaved = await userRepository.setPasswordResetToken(user.email, resetToken, expiresAt)
+      // Gera token de reset usando emailService
+      const resetToken = emailService.generatePasswordResetToken()
       
-      if (!tokenSaved) {
-        throw new Error('Erro interno. Tente novamente mais tarde.')
+      // Salva o token no banco de dados
+      await emailService.savePasswordResetToken(user.id, resetToken)
+
+      // Envia email de reset de senha
+      const emailResult = await emailService.sendPasswordResetEmail({
+        email: user.email,
+        name: user.name,
+        token: resetToken
+      })
+
+      if (!emailResult.success) {
+        throw new Error('Erro ao enviar email de reset. Tente novamente mais tarde.')
       }
 
       // Log de solicitação de reset bem-sucedida
       await this.logService.info('Solicitação de reset de senha realizada', {
         userId: user.id,
         email: user.email,
-        tokenExpiry: expiresAt,
         duration: Date.now() - startTime
       }, {
         userId: user.id,
@@ -359,13 +368,6 @@ export class AuthService {
         path: '/api/auth/forgot-password',
         ip: ip || 'unknown'
       })
-
-      // Log para desenvolvimento (em produção, enviar email)
-      console.log(`Token de reset para ${user.email}: ${resetToken}`)
-      console.log(`Link de reset: ${process.env.FRONTEND_URL}/reset-password?token=${resetToken}`)
-
-      // Em produção, você enviaria um email aqui
-      // await emailService.sendPasswordResetEmail(user.email, resetToken)
 
       return {
         message: 'Se o email existir em nossa base, você receberá instruções para redefinir sua senha.'
@@ -396,10 +398,10 @@ export class AuthService {
     const startTime = Date.now()
     
     try {
-      // Busca usuário pelo token de reset
-      const user = await userRepository.findByPasswordResetToken(data.token)
+      // Valida o token de reset usando emailService
+      const tokenValidation = await emailService.validatePasswordResetToken(data.token)
       
-      if (!user) {
+      if (!tokenValidation.valid || !tokenValidation.userId) {
         // Log de tentativa de reset com token inválido
         await this.logService.warn('Tentativa de reset com token inválido', {
           token: data.token.substring(0, 10) + '...', // Log apenas parte do token por segurança
@@ -414,6 +416,12 @@ export class AuthService {
         throw new Error('Token de reset inválido ou expirado')
       }
 
+      // Busca o usuário para obter informações completas
+      const user = await userRepository.findById(tokenValidation.userId)
+      if (!user) {
+        throw new Error('Usuário não encontrado')
+      }
+
       // Hash da nova senha
       const hashedPassword = await hashPassword(data.newPassword)
 
@@ -426,8 +434,8 @@ export class AuthService {
         throw new Error('Erro ao atualizar senha. Tente novamente.')
       }
 
-      // Limpa o token de reset
-      await userRepository.clearPasswordResetToken(user.id)
+      // Limpa o token de reset usando emailService
+      await emailService.clearPasswordResetToken(user.id)
 
       // Log de reset de senha bem-sucedido
       await this.logService.info('Senha redefinida com sucesso', {
@@ -501,25 +509,34 @@ export class AuthService {
    * Verifica email do usuário
    */
   async verifyEmail(token: string): Promise<{ message: string }> {
-    // Busca usuário pelo token de verificação
-    const user = await userRepository.findByEmailVerificationToken(token)
+    // Valida o token usando o emailService
+    const validation = await emailService.validateVerificationToken(token)
     
-    if (!user) {
+    if (!validation.valid || !validation.userId) {
       throw new Error('Token de verificação inválido ou expirado')
     }
 
-    if (user.emailVerified) {
+    // Verifica se o email já foi verificado
+    const isAlreadyVerified = await emailService.isEmailVerified(validation.userId)
+    if (isAlreadyVerified) {
       return {
         message: 'Email já foi verificado anteriormente.'
       }
     }
     
-    // Verifica o email do usuário
-    const verifiedUser = await userRepository.verifyEmail(user.id)
+    // Marca o email como verificado
+    await emailService.markEmailAsVerified(validation.userId)
     
-    if (!verifiedUser) {
-      throw new Error('Erro ao verificar email. Tente novamente.')
-    }
+    // Log da verificação bem-sucedida
+    await this.logService.info('Email verificado com sucesso', {
+      userId: validation.userId
+    }, {
+      action: 'EMAIL_VERIFIED',
+      resource: 'auth',
+      method: 'POST',
+      path: '/api/auth/verify-email',
+      ip: 'system'
+    })
     
     return {
       message: 'Email verificado com sucesso! Sua conta está agora ativa.'
@@ -545,23 +562,34 @@ export class AuthService {
       }
     }
 
-    // Gera novo token de verificação (válido por 24 horas)
-    const verificationToken = generateResetToken()
-    const expiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000) // 24 horas
-
-    // Salva o token no banco de dados
-    const tokenSaved = await userRepository.setEmailVerificationToken(user.id, verificationToken, expiresAt)
+    // Gera novo token de verificação
+    const verificationToken = emailService.generateVerificationToken()
     
-    if (!tokenSaved) {
-      throw new Error('Erro interno. Tente novamente mais tarde.')
+    // Salva o token no banco de dados
+    await emailService.saveVerificationToken(user.id, verificationToken)
+    
+    // Envia o email de verificação
+    const emailResult = await emailService.sendVerificationEmail({
+      email: user.email,
+      name: user.name,
+      token: verificationToken
+    })
+    
+    if (!emailResult.success) {
+      throw new Error('Erro ao enviar email de verificação. Tente novamente mais tarde.')
     }
 
-    // Log para desenvolvimento (em produção, enviar email)
-    console.log(`Token de verificação para ${user.email}: ${verificationToken}`)
-    console.log(`Link de verificação: ${process.env.FRONTEND_URL}/verify-email?token=${verificationToken}`)
-
-    // Em produção, você enviaria um email aqui
-    // await emailService.sendVerificationEmail(user.email, verificationToken)
+    // Log do reenvio de email
+    await this.logService.info('Email de verificação reenviado', {
+      email: user.email,
+      userId: user.id
+    }, {
+      action: 'RESEND_VERIFICATION_EMAIL',
+      resource: 'auth',
+      method: 'POST',
+      path: '/api/auth/resend-verification',
+      ip: 'system'
+    })
 
     return {
       message: 'Se o email existir e não estiver verificado, um novo email de verificação será enviado.'
