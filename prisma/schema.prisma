@@ -23,5 +23,35 @@ model User {
   createdAt     DateTime @default(now())
   updatedAt     DateTime @updatedAt
 
+  // Relacionamento com logs
+  logs          Log[]
+
   @@map("users")
+}
+
+model Log {
+  id          String    @id @default(cuid())
+  userId      String?
+  action      String
+  resource    String
+  method      String
+  path        String
+  statusCode  Int
+  userAgent   String?
+  ip          String
+  timestamp   DateTime  @default(now())
+  duration    Int?      // em millisegundos
+  error       String?
+  metadata    String?   // JSON string para dados adicionais
+  level       String    @default("info") // error, warn, info, debug
+  
+  // Relacionamento com usuário
+  user        User?     @relation(fields: [userId], references: [id], onDelete: SetNull)
+  
+  @@map("logs")
+  @@index([userId])
+  @@index([timestamp])
+  @@index([level])
+  @@index([action])
+  @@index([resource])
 }

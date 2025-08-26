@@ -14,6 +14,7 @@ import { errorHandler } from '@/middlewares/errorHandler'
 // Importar rotas
 import { authRoutes } from '@/routes/authRoutes'
 import { userRoutes } from '@/routes/userRoutes'
+import { logRoutes } from '@/routes/logRoutes'
 import { env, config } from '@/config/env'
 import { connectDatabase } from '@/config/database'
 
@@ -76,6 +77,7 @@ if (env.NODE_ENV === 'development') {
 // Rotas da aplicação
 app.route('/api/auth', authRoutes)
 app.route('/api/users', userRoutes)
+app.route('/api/logs', logRoutes)
 
 // Documentação Swagger
 if (config.features.swagger) {

@@ -78,6 +78,42 @@ export interface LogEntry {
   timestamp: Date
   duration?: number
   error?: string
+  level?: string // error, warn, info, debug
+  metadata?: any // dados adicionais em formato JSON
+  user?: {
+    id: string
+    name: string
+    email: string
+  }
+}
+
+// Níveis de log
+export enum LogLevel {
+  ERROR = 'error',
+  WARN = 'warn',
+  INFO = 'info',
+  DEBUG = 'debug'
+}
+
+// Filtros para busca de logs
+export interface LogFilters {
+  userId?: string
+  action?: string
+  resource?: string
+  level?: LogLevel
+  startDate?: Date
+  endDate?: Date
+  limit?: number
+  offset?: number
+}
+
+// Estatísticas de logs
+export interface LogStats {
+  total: number
+  byLevel: Record<string, number>
+  byAction: Record<string, number>
+  byResource: Record<string, number>
+  errorRate: number
 }
 
 // Tipos para validação

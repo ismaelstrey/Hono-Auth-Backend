@@ -1,18 +1,42 @@
 import type { ErrorHandler } from 'hono'
 import { HTTPException } from 'hono/http-exception'
 import { errorResponse } from '@/utils/helpers'
+import { 
+  AppError, 
+  PrismaErrorHandler, 
+  isOperationalError, 
+  formatErrorForLogging,
+  TokenError,
+  RateLimitError,
+  FileError,
+  ServiceUnavailableError,
+  InternalServerError
+} from '@/utils/errors'
 
 /**
  * Middleware global de tratamento de erros
  */
 export const errorHandler: ErrorHandler = (err, c) => {
-  console.error('Error occurred:', {
-    message: err.message,
-    stack: err.stack,
+  // Contexto da requisição para logging
+  const requestContext = {
     url: c.req.url,
     method: c.req.method,
-    timestamp: new Date().toISOString()
-  })
+    userAgent: c.req.header('User-Agent'),
+    ip: c.req.header('X-Forwarded-For') || c.req.header('X-Real-IP') || 'unknown',
+    requestId: c.get('requestId')
+  }
+
+  // Log estruturado do erro
+  const errorLog = formatErrorForLogging(err, requestContext)
+  console.error('Error occurred:', errorLog)
+
+  // Se for um erro customizado da aplicação
+  if (err instanceof AppError) {
+    return c.json(
+      errorResponse(err.message, err.details?.errors),
+      err.statusCode
+    )
+  }
 
   // Se for uma HTTPException do Hono
   if (err instanceof HTTPException) {
@@ -22,102 +46,80 @@ export const errorHandler: ErrorHandler = (err, c) => {
     )
   }
 
-  // Erros de validação
-  if (err.name === 'ValidationError') {
+  // Erros de validação do Zod
+  if (err.name === 'ZodError') {
+    const validationErrors = err.issues?.map((issue: any) => ({
+      field: issue.path.join('.'),
+      message: issue.message
+    }))
+    
     return c.json(
-      errorResponse('Dados inválidos', [{
-        field: 'validation',
-        message: err.message
-      }]),
+      errorResponse('Dados de entrada inválidos', validationErrors),
       400
     )
   }
 
   // Erros de JWT
-  if (err.name === 'JsonWebTokenError') {
+  if (err.name === 'JsonWebTokenError' || err.name === 'TokenExpiredError') {
+    const tokenError = new TokenError(
+      err.name === 'TokenExpiredError' ? 'Token expirado' : 'Token inválido'
+    )
     return c.json(
-      errorResponse('Token inválido'),
-      401
+      errorResponse(tokenError.message),
+      tokenError.statusCode
     )
   }
 
-  if (err.name === 'TokenExpiredError') {
+  // Erros do Prisma
+  if ('code' in err && typeof err.code === 'string' && err.code.startsWith('P')) {
+    const prismaError = PrismaErrorHandler.handle(err)
     return c.json(
-      errorResponse('Token expirado'),
-      401
-    )
-  }
-
-  // Erros de banco de dados (Prisma)
-  if ('code' in err && err.code === 'P2002') {
-    return c.json(
-      errorResponse('Dados duplicados: este registro já existe'),
-      409
-    )
-  }
-
-  if ('code' in err && err.code === 'P2025') {
-    return c.json(
-      errorResponse('Registro não encontrado'),
-      404
-    )
-  }
-
-  // Erros de conexão com banco
-  if ('code' in err && err.code === 'P1001') {
-    return c.json(
-      errorResponse('Erro de conexão com o banco de dados'),
-      503
-    )
-  }
-
-  // Erro de sintaxe SQL
-  if ('code' in err && typeof err.code === 'string' && err.code.startsWith('P2')) {
-    return c.json(
-      errorResponse('Erro interno do banco de dados'),
-      500
+      errorResponse(prismaError.message),
+      prismaError.statusCode
     )
   }
 
   // Erros de rate limiting
-  if (err.message?.includes('rate limit')) {
+  if (err.message?.includes('rate limit') || err.name === 'RateLimitError') {
+    const rateLimitError = new RateLimitError()
     return c.json(
-      errorResponse('Muitas tentativas. Tente novamente mais tarde.'),
-      429
+      errorResponse(rateLimitError.message),
+      rateLimitError.statusCode
     )
   }
 
   // Erros de arquivo/upload
-  if ('code' in err && err.code === 'LIMIT_FILE_SIZE') {
+  if ('code' in err && (err.code === 'LIMIT_FILE_SIZE' || err.code === 'LIMIT_UNEXPECTED_FILE')) {
+    const message = err.code === 'LIMIT_FILE_SIZE' 
+      ? 'Arquivo muito grande' 
+      : 'Tipo de arquivo não permitido'
+    const fileError = new FileError(message, err.code === 'LIMIT_FILE_SIZE' ? 413 : 400)
     return c.json(
-      errorResponse('Arquivo muito grande'),
-      413
-    )
-  }
-
-  if ('code' in err && err.code === 'LIMIT_UNEXPECTED_FILE') {
-    return c.json(
-      errorResponse('Tipo de arquivo não permitido'),
-      400
+      errorResponse(fileError.message),
+      fileError.statusCode
     )
   }
 
   // Erros de rede/timeout
   if ('code' in err && (err.code === 'ECONNREFUSED' || err.code === 'ETIMEDOUT')) {
+    const serviceError = new ServiceUnavailableError()
     return c.json(
-      errorResponse('Serviço temporariamente indisponível'),
-      503
+      errorResponse(serviceError.message),
+      serviceError.statusCode
     )
   }
 
-  // Erro genérico
+  // Erro genérico - não operacional
+  const internalError = new InternalServerError(
+    process.env.NODE_ENV === 'production' 
+      ? 'Erro interno do servidor' 
+      : err.message,
+    process.env.NODE_ENV !== 'production' ? { originalError: err.message, stack: err.stack } : undefined
+  )
+
   return c.json(
-    errorResponse(
-      process.env.NODE_ENV === 'production' 
-        ? 'Erro interno do servidor' 
-        : err.message
-    ),
-    500
+    errorResponse(internalError.message, internalError.details?.errors),
+    internalError.statusCode
   )
 }
 

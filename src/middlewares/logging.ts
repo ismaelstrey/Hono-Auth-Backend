@@ -2,9 +2,7 @@ import { createMiddleware } from 'hono/factory'
 import type { Context } from 'hono'
 import type { LogEntry, JWTPayload } from '@/types'
 import { generateId, getTimeElapsed } from '@/utils/helpers'
-
-// Armazenamento em memória para logs (em produção, use banco de dados)
-const logs: LogEntry[] = []
+import { logService } from '@/services/logService'
 
 /**
  * Middleware de logging personalizado
@@ -25,13 +23,20 @@ export const loggingMiddleware = createMiddleware(async (c: Context, next) => {
     const user = c.get('user') as JWTPayload | undefined
     const logEntry = createLogEntry(c, user, startTime, duration)
     
-    // Salva o log
-    saveLog(logEntry)
-    
-    // Log no console em desenvolvimento
-    if (process.env.NODE_ENV !== 'production') {
-      console.log(formatLogForConsole(logEntry))
-    }
+    // Salva o log usando o serviço estruturado
+    await logService.log({
+      userId: logEntry.userId,
+      action: logEntry.action,
+      resource: logEntry.resource,
+      method: logEntry.method,
+      path: logEntry.path,
+      statusCode: logEntry.statusCode,
+      userAgent: logEntry.userAgent,
+      ip: logEntry.ip,
+      duration: logEntry.duration,
+      error: logEntry.error,
+      level: logEntry.statusCode >= 500 ? 'error' : logEntry.statusCode >= 400 ? 'warn' : 'info'
+    })
   }
 })
 
@@ -122,42 +127,7 @@ function getErrorFromResponse(c: Context): string | undefined {
   return `HTTP ${c.res.status}`
 }
 
-/**
- * Salva o log (em produção, salvar no banco de dados)
- */
-function saveLog(logEntry: LogEntry): void {
-  logs.push(logEntry)
-  
-  // Limita o número de logs em memória
-  if (logs.length > 1000) {
-    logs.splice(0, logs.length - 1000)
-  }
-  
-  // Em produção, você salvaria no banco de dados:
-  // await logRepository.create(logEntry)
-}
 
-/**
- * Formata log para exibição no console
- */
-function formatLogForConsole(logEntry: LogEntry): string {
-  const { method, path, statusCode, duration, userId, ip } = logEntry
-  const userInfo = userId ? ` [User: ${userId}]` : ''
-  const statusColor = getStatusColor(statusCode)
-  
-  return `${statusColor}${method} ${path} ${statusCode}\x1b[0m ${duration}ms [${ip}]${userInfo}`
-}
-
-/**
- * Obtém cor para o status code
- */
-function getStatusColor(statusCode: number): string {
-  if (statusCode >= 500) return '\x1b[31m' // Vermelho
-  if (statusCode >= 400) return '\x1b[33m' // Amarelo
-  if (statusCode >= 300) return '\x1b[36m' // Ciano
-  if (statusCode >= 200) return '\x1b[32m' // Verde
-  return '\x1b[0m' // Reset
-}
 
 /**
  * Middleware para log de ações específicas
@@ -166,8 +136,7 @@ export const logAction = (action: string, resource: string) => {
   return createMiddleware(async (c: Context, next) => {
     const user = c.get('user') as JWTPayload | undefined
     
-    const logEntry: LogEntry = {
-      id: generateId(),
+    await logService.log({
       userId: user?.userId,
       action,
       resource,
@@ -176,70 +145,42 @@ export const logAction = (action: string, resource: string) => {
       statusCode: 200,
       userAgent: c.req.header('User-Agent'),
       ip: getClientIP(c),
-      timestamp: new Date(),
-      duration: 0
-    }
+      duration: 0,
+      level: 'info'
+    })
     
-    saveLog(logEntry)
     await next()
   })
 }
 
 /**
- * Obtém logs filtrados
+ * Obtém logs filtrados (wrapper para o serviço de logs)
  */
-export const getLogs = (filters: {
+export const getLogs = async (filters: {
   userId?: string
   action?: string
   resource?: string
   startDate?: Date
   endDate?: Date
   limit?: number
-} = {}): LogEntry[] => {
-  let filteredLogs = [...logs]
-  
-  if (filters.userId) {
-    filteredLogs = filteredLogs.filter(log => log.userId === filters.userId)
-  }
-  
-  if (filters.action) {
-    filteredLogs = filteredLogs.filter(log => log.action === filters.action)
-  }
-  
-  if (filters.resource) {
-    filteredLogs = filteredLogs.filter(log => log.resource === filters.resource)
-  }
-  
-  if (filters.startDate) {
-    filteredLogs = filteredLogs.filter(log => log.timestamp >= filters.startDate!)
-  }
-  
-  if (filters.endDate) {
-    filteredLogs = filteredLogs.filter(log => log.timestamp <= filters.endDate!)
-  }
-  
-  // Ordena por timestamp decrescente
-  filteredLogs.sort((a, b) => b.timestamp.getTime() - a.timestamp.getTime())
-  
-  if (filters.limit) {
-    filteredLogs = filteredLogs.slice(0, filters.limit)
-  }
-  
-  return filteredLogs
+  offset?: number
+} = {}) => {
+  return await logService.getLogs(filters)
 }
 
 /**
- * Limpa logs antigos
+ * Limpa logs antigos (wrapper para o serviço de logs)
  */
-export const clearOldLogs = (daysToKeep: number = 30): number => {
-  const cutoffDate = new Date()
-  cutoffDate.setDate(cutoffDate.getDate() - daysToKeep)
-  
-  const initialLength = logs.length
-  const filteredLogs = logs.filter(log => log.timestamp >= cutoffDate)
-  
-  logs.length = 0
-  logs.push(...filteredLogs)
-  
-  return initialLength - logs.length
+export const clearOldLogs = async (daysToKeep: number = 30): Promise<number> => {
+  return await logService.cleanupOldLogs(daysToKeep)
+}
+
+/**
+ * Obtém estatísticas de logs (wrapper para o serviço de logs)
+ */
+export const getLogStats = async (filters: {
+  startDate?: Date
+  endDate?: Date
+} = {}) => {
+  return await logService.getStats(filters)
 }
