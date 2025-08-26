@@ -1,6 +1,6 @@
 import { PrismaClient } from '@prisma/client'
 import type { LogEntry } from '@/types'
-import { AppError, DatabaseError } from '@/utils/errors'
+import { DatabaseError } from '@/utils/errors'
 
 /**
  * Repositório para operações de logs usando Prisma

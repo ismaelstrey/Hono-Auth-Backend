@@ -257,11 +257,11 @@ export class LogService {
    */
   private getLevelColor(level: string): string {
     switch (level) {
-      case 'error': return '\x1b[31m' // Vermelho
-      case 'warn': return '\x1b[33m' // Amarelo
-      case 'info': return '\x1b[36m' // Ciano
-      case 'debug': return '\x1b[35m' // Magenta
-      default: return '\x1b[0m' // Reset
+    case 'error': return '\x1b[31m' // Vermelho
+    case 'warn': return '\x1b[33m' // Amarelo
+    case 'info': return '\x1b[36m' // Ciano
+    case 'debug': return '\x1b[35m' // Magenta
+    default: return '\x1b[0m' // Reset
     }
   }
 

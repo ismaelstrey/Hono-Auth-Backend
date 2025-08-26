@@ -159,59 +159,59 @@ export class PrismaErrorHandler {
     }
 
     switch (error.code) {
-      case 'P2002':
-        return new ConflictError('Dados duplicados: este registro já existe')
+    case 'P2002':
+      return new ConflictError('Dados duplicados: este registro já existe')
       
-      case 'P2025':
-        return new NotFoundError('Registro não encontrado')
+    case 'P2025':
+      return new NotFoundError('Registro não encontrado')
       
-      case 'P1001':
-        return new ServiceUnavailableError('Erro de conexão com o banco de dados')
+    case 'P1001':
+      return new ServiceUnavailableError('Erro de conexão com o banco de dados')
       
-      case 'P2003':
-        return new ValidationError('Violação de chave estrangeira')
+    case 'P2003':
+      return new ValidationError('Violação de chave estrangeira')
       
-      case 'P2004':
-        return new ValidationError('Violação de restrição no banco de dados')
+    case 'P2004':
+      return new ValidationError('Violação de restrição no banco de dados')
       
-      case 'P2011':
-        return new ValidationError('Violação de restrição de nulidade')
+    case 'P2011':
+      return new ValidationError('Violação de restrição de nulidade')
       
-      case 'P2012':
-        return new ValidationError('Valor obrigatório ausente')
+    case 'P2012':
+      return new ValidationError('Valor obrigatório ausente')
       
-      case 'P2013':
-        return new ValidationError('Argumento obrigatório ausente')
+    case 'P2013':
+      return new ValidationError('Argumento obrigatório ausente')
       
-      case 'P2014':
-        return new ValidationError('Mudança violaria uma relação obrigatória')
+    case 'P2014':
+      return new ValidationError('Mudança violaria uma relação obrigatória')
       
-      case 'P2015':
-        return new NotFoundError('Registro relacionado não encontrado')
+    case 'P2015':
+      return new NotFoundError('Registro relacionado não encontrado')
       
-      case 'P2016':
-        return new ValidationError('Erro de interpretação de consulta')
+    case 'P2016':
+      return new ValidationError('Erro de interpretação de consulta')
       
-      case 'P2017':
-        return new ValidationError('Registros não conectados')
+    case 'P2017':
+      return new ValidationError('Registros não conectados')
       
-      case 'P2018':
-        return new NotFoundError('Registros conectados obrigatórios não encontrados')
+    case 'P2018':
+      return new NotFoundError('Registros conectados obrigatórios não encontrados')
       
-      case 'P2019':
-        return new ValidationError('Erro de entrada')
+    case 'P2019':
+      return new ValidationError('Erro de entrada')
       
-      case 'P2020':
-        return new ValidationError('Valor fora do intervalo para o tipo')
+    case 'P2020':
+      return new ValidationError('Valor fora do intervalo para o tipo')
       
-      case 'P2021':
-        return new NotFoundError('Tabela não existe no banco de dados atual')
+    case 'P2021':
+      return new NotFoundError('Tabela não existe no banco de dados atual')
       
-      case 'P2022':
-        return new NotFoundError('Coluna não existe no banco de dados atual')
+    case 'P2022':
+      return new NotFoundError('Coluna não existe no banco de dados atual')
       
-      default:
-        return new DatabaseError(`Erro do banco de dados: ${error.code}`, error)
+    default:
+      return new DatabaseError(`Erro do banco de dados: ${error.code}`, error)
     }
   }
 }
