@@ -35,12 +35,27 @@
   - [x] Middleware de proteção para emails não verificados
   - [x] Integração no fluxo de registro
   - [x] Documentação Swagger atualizada
+- [x] **Sistema de recuperação de senha completo**
+  - [x] Schema do banco com campos de reset (passwordResetToken, passwordResetExpires)
+  - [x] Geração de tokens seguros com expiração (1 hora)
+  - [x] Endpoint POST /api/auth/forgot-password para solicitar reset
+  - [x] Endpoint POST /api/auth/reset-password para confirmar nova senha
+  - [x] Envio de emails com links de recuperação
+  - [x] Validação robusta de senhas (8-128 chars, critérios rigorosos)
+  - [x] Rate limiting específico (3 tentativas por hora)
+  - [x] Limpeza automática de tokens após uso
+  - [x] Testes end-to-end completos
+  - [x] Documentação Swagger atualizada
 
 ### 🛣️ Endpoints da API
 - [x] **POST** `/api/auth/register` - Registro de usuários
 - [x] **POST** `/api/auth/login` - Login de usuários
 - [x] **POST** `/api/auth/refresh` - Renovação de tokens
 - [x] **POST** `/api/auth/logout` - Logout de usuários
+- [x] **POST** `/api/auth/forgot-password` - Solicitar reset de senha
+- [x] **POST** `/api/auth/reset-password` - Confirmar nova senha com token
+- [x] **POST** `/api/auth/verify-email` - Verificar email com token
+- [x] **POST** `/api/auth/resend-verification` - Reenviar email de verificação
 - [x] **GET** `/api/users/profile` - Perfil do usuário autenticado
 - [x] **PUT** `/api/users/profile` - Atualização do perfil
 - [x] **DELETE** `/api/users/profile` - Exclusão da conta
@@ -81,13 +96,7 @@
 
 ## 🔄 Tarefas em Andamento
 
-### 🔐 Sistema de Recuperação de Senha
-- [🔄] **Implementar sistema de recuperação de senha** (próxima etapa)
-  - [ ] Endpoint para solicitar reset de senha
-  - [ ] Geração de tokens de reset seguros
-  - [ ] Envio de email com link de reset
-  - [ ] Endpoint para confirmar nova senha
-  - [ ] Validação de tokens com expiração
+*Nenhuma tarefa em andamento no momento. Todas as funcionalidades principais foram implementadas.*
 
 ---
 
@@ -104,7 +113,7 @@
 
 - [ ] **Melhorias na Autenticação**
   - [x] Implementar verificação de email ✅
-  - [ ] Sistema de recuperação de senha
+  - [x] Sistema de recuperação de senha ✅
   - [ ] Bloqueio de conta após tentativas falhadas
   - [ ] Logs de atividade de login
 
@@ -233,7 +242,8 @@
 
 | Fase | Duração | Prioridade | Status |
 |------|---------|------------|---------|
-| Integração Prisma | 1-2 dias | 🔴 Alta | 🔄 Em Andamento |
+| Integração Prisma | 1-2 dias | 🔴 Alta | ✅ Concluída |
+| Funcionalidades Core | 2-3 dias | 🔴 Alta | ✅ Concluída |
 | Funcionalidades Avançadas | 3-5 dias | 🟡 Média | ⏳ Pendente |
 | Qualidade e Testes | 2-3 dias | 🔴 Alta | ⏳ Pendente |
 | Segurança e Performance | 2-3 dias | 🔴 Alta | ⏳ Pendente |
@@ -245,23 +255,26 @@
 
 ## 🚀 Próximos Passos Imediatos
 
-1. **Finalizar integração do Prisma** (Prioridade Máxima)
-   - Completar configuração do cliente
-   - Migrar repository para Prisma
-   - Testar todas as funcionalidades
+1. **Implementar funcionalidades avançadas** (Próxima Prioridade)
+   - Sistema de roles e permissões
+   - Bloqueio de conta após tentativas falhadas
+   - Logs de atividade de login
+   - Upload de avatar
 
-2. **Implementar testes básicos**
+2. **Implementar testes automatizados**
    - Testes unitários para services
    - Testes de integração para endpoints
+   - Coverage de código (>80%)
 
-3. **Melhorar documentação**
-   - Atualizar README com instruções completas
-   - Documentar todas as rotas no Swagger
+3. **Melhorar segurança e performance**
+   - Headers de segurança (Helmet.js)
+   - Implementação de cache (Redis)
+   - Otimização de queries
 
 4. **Preparar para produção**
    - Configurar PostgreSQL
    - Implementar logs estruturados
-   - Configurar variáveis de ambiente
+   - Containerização com Docker
 
 ---
 
@@ -280,4 +293,10 @@
 Este roadmap serve como guia para o desenvolvimento contínuo do projeto. Cada fase deve ser completada antes de avançar para a próxima, garantindo qualidade e estabilidade.
 
 **Última atualização**: Janeiro 2025
-**Versão do Roadmap**: 1.0
+**Versão do Roadmap**: 1.1
+
+### 🎉 Marcos Importantes
+- **✅ Sistema de Autenticação Completo** - Janeiro 2025
+  - Registro, login, verificação de email e recuperação de senha
+  - Rate limiting, validações robustas e documentação Swagger
+  - Integração completa com Prisma e SQLite
