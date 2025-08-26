@@ -1,7 +1,7 @@
 import { LogRepository } from '@/repositories/logRepository'
 import { prisma } from '@/config/database'
 import type { LogEntry, LogFilters, LogStats, LogLevel } from '@/types'
-import { AppError } from '@/utils/errors'
+import { InternalServerError } from '@/utils/errors'
 import { env } from '@/config/env'
 
 /**
@@ -35,11 +35,11 @@ export class LogService {
       }
 
       // Salva no banco de dados
-      await this.logRepository.create(logEntry)
+      await this.logRepository.create(logEntry as Omit<LogEntry, 'id'>)
 
       // Log no console em desenvolvimento
       if (process.env.NODE_ENV !== 'production') {
-        this.logToConsole(logEntry)
+        this.logToConsole(logEntry as LogEntry)
       }
 
       // Limpa logs antigos periodicamente
@@ -176,7 +176,7 @@ export class LogService {
         totalPages
       }
     } catch (error) {
-      throw new AppError('Erro ao buscar logs', 500, error)
+      throw new InternalServerError('Erro ao buscar logs', error)
     }
   }
 
@@ -190,7 +190,7 @@ export class LogService {
     try {
       return await this.logRepository.getStats(filters)
     } catch (error) {
-      throw new AppError('Erro ao obter estatísticas de logs', 500, error)
+      throw new InternalServerError('Erro ao obter estatísticas de logs', error)
     }
   }
 
@@ -201,7 +201,7 @@ export class LogService {
     try {
       return await this.logRepository.deleteOldLogs(daysToKeep)
     } catch (error) {
-      throw new AppError('Erro ao limpar logs antigos', 500, error)
+      throw new InternalServerError('Erro ao limpar logs antigos', error)
     }
   }
 
@@ -212,7 +212,7 @@ export class LogService {
     const levels = ['debug', 'info', 'warn', 'error']
     const currentLevelIndex = levels.indexOf(this.logLevel)
     const logLevelIndex = levels.indexOf(level)
-    
+
     return logLevelIndex >= currentLevelIndex
   }
 
@@ -235,7 +235,7 @@ export class LogService {
     const errorInfo = error ? ` - ${error}` : ''
     const statusColor = this.getStatusColor(statusCode)
     const levelColor = this.getLevelColor(level || 'info')
-    
+
     console.log(
       `${levelColor}[${level?.toUpperCase()}]\x1b[0m ${statusColor}${method} ${path} ${statusCode}\x1b[0m${durationInfo} [${ip}]${userInfo}${errorInfo}`
     )
