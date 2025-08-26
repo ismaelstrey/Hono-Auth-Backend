@@ -209,7 +209,7 @@ export class AuthService {
       }
 
       // Login bem-sucedido - limpa tentativas falhadas
-      if (user.failedLoginAttempts > 0 || user.lockedUntil) {
+      if ((user.failedLoginAttempts && user.failedLoginAttempts > 0) || user.lockedUntil) {
         await userRepository.clearFailedLoginAttempts(user.id)
       }
 
@@ -415,7 +415,7 @@ export class AuthService {
       }
 
       // Hash da nova senha
-      const hashedPassword = await hashPassword(data.password)
+      const hashedPassword = await hashPassword(data.newPassword)
 
       // Atualiza a senha do usuário
       const updatedUser = await userRepository.update(user.id, {
