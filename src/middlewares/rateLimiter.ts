@@ -29,6 +29,20 @@ export const clearRateLimitForIP = (ip: string) => {
 }
 
 /**
+ * Função para limpar registros que contenham um padrão específico (útil para User-Agent)
+ */
+export const clearRateLimitByPattern = (pattern: string) => {
+  const keysToDelete: string[] = []
+  for (const [key] of requestCounts.entries()) {
+    if (key.toLowerCase().includes(pattern.toLowerCase())) {
+      keysToDelete.push(key)
+    }
+  }
+  keysToDelete.forEach(key => requestCounts.delete(key))
+  console.log(`🧹 Rate limit records cleared for pattern: ${pattern} (${keysToDelete.length} records)`)
+}
+
+/**
  * Configurações padrão de rate limiting
  */
 const defaultConfig: RateLimitConfig = {
@@ -46,6 +60,8 @@ export const createRateLimiter = (config: Partial<RateLimitConfig> = {}) => {
   return createMiddleware(async (c: Context, next) => {
     const clientId = getClientId(c)
     const now = Date.now()
+
+    // Debug logs removidos para produção
 
     // Limpa registros expirados periodicamente
     cleanExpiredRecords(now)
