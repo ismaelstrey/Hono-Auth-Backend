@@ -48,6 +48,8 @@
   - [x] Documentação Swagger atualizada
 
 ### 🛣️ Endpoints da API
+
+#### 🔐 Rotas de Autenticação
 - [x] **POST** `/api/auth/register` - Registro de usuários
 - [x] **POST** `/api/auth/login` - Login de usuários
 - [x] **POST** `/api/auth/refresh` - Renovação de tokens
@@ -56,9 +58,52 @@
 - [x] **POST** `/api/auth/reset-password` - Confirmar nova senha com token
 - [x] **POST** `/api/auth/verify-email` - Verificar email com token
 - [x] **POST** `/api/auth/resend-verification` - Reenviar email de verificação
+
+#### 👤 Rotas de Usuários
+- [x] **GET** `/api/users` - Listar usuários (admin)
 - [x] **GET** `/api/users/profile` - Perfil do usuário autenticado
 - [x] **PUT** `/api/users/profile` - Atualização do perfil
 - [x] **DELETE** `/api/users/profile` - Exclusão da conta
+- [x] **GET** `/api/users/stats` - Estatísticas de usuários
+- [x] **GET** `/api/users/{id}` - Obter usuário específico
+- [x] **PUT** `/api/users/{id}` - Atualizar usuário específico
+- [x] **DELETE** `/api/users/{id}` - Deletar usuário específico
+
+#### 👥 Rotas de Perfis
+- [x] **GET** `/api/profiles` - Listar perfis com filtros
+- [x] **POST** `/api/profiles` - Criar novo perfil
+- [x] **GET** `/api/profiles/me` - Perfil do usuário autenticado
+- [x] **PUT** `/api/profiles/me` - Atualizar perfil próprio
+- [x] **DELETE** `/api/profiles/me` - Deletar perfil próprio
+- [x] **POST** `/api/profiles/upsert` - Criar ou atualizar perfil
+- [x] **POST** `/api/profiles/upload-avatar` - Upload de avatar
+- [x] **GET** `/api/profiles/stats` - Estatísticas de perfis
+- [x] **GET** `/api/profiles/{id}` - Obter perfil específico
+- [x] **PUT** `/api/profiles/{id}` - Atualizar perfil específico
+- [x] **DELETE** `/api/profiles/{id}` - Deletar perfil específico
+
+#### 🔔 Rotas de Notificações
+- [x] **GET** `/api/notifications` - Listar notificações com filtros
+- [x] **POST** `/api/notifications` - Criar nova notificação
+- [x] **GET** `/api/notifications/me` - Notificações do usuário autenticado
+- [x] **PATCH** `/api/notifications/{id}/read` - Marcar notificação como lida
+- [x] **POST** `/api/notifications/send` - Enviar notificação imediatamente
+- [x] **POST** `/api/notifications/process-pending` - Processar notificações pendentes
+- [x] **GET** `/api/notifications/stats` - Estatísticas de notificações
+- [x] **GET** `/api/notifications/preferences` - Preferências de notificação
+- [x] **PUT** `/api/notifications/preferences` - Atualizar preferências
+- [x] **GET** `/api/notifications/types` - Listar tipos de notificação
+- [x] **POST** `/api/notifications/types` - Criar novo tipo de notificação
+
+#### 📋 Rotas de Logs
+- [x] **GET** `/api/logs` - Listar logs com filtros avançados
+- [x] **POST** `/api/logs` - Registrar log manualmente
+- [x] **GET** `/api/logs/stats` - Estatísticas de logs
+- [x] **GET** `/api/logs/errors` - Logs de erro com detalhes
+- [x] **GET** `/api/logs/recent` - Logs de atividade recente
+- [x] **GET** `/api/logs/user/{userId}` - Logs de usuário específico
+- [x] **POST** `/api/logs/cleanup` - Limpeza de logs antigos
+- [x] **GET** `/api/logs/health` - Health check do serviço de logs
 
 ### 🛡️ Middlewares
 - [x] Rate Limiting avançado com diferentes limites por endpoint
@@ -74,6 +119,17 @@
 
 ### 📚 Documentação
 - [x] Documentação Swagger/OpenAPI integrada
+- [x] **Reestruturação completa da documentação Swagger** ✅
+  - [x] Modularização da documentação em arquivos separados
+  - [x] Arquivo principal `openapi.ts` com configuração consolidada
+  - [x] Documentação específica para rotas de autenticação (`authPaths.ts`)
+  - [x] Documentação específica para rotas de usuários (`userPaths.ts`)
+  - [x] Documentação específica para rotas de perfis (`profilePaths.ts`)
+  - [x] Documentação específica para rotas de notificações (`notificationPaths.ts`)
+  - [x] Documentação específica para rotas de logs (`logPaths.ts`)
+  - [x] Schemas e componentes organizados e reutilizáveis
+  - [x] Substituição de ~1000 linhas de documentação inline por estrutura modular
+  - [x] Swagger UI totalmente funcional em `/docs`
 - [x] README.md com instruções de uso
 - [x] Rotas de desenvolvimento para testes
 
@@ -295,7 +351,7 @@
 Este roadmap serve como guia para o desenvolvimento contínuo do projeto. Cada fase deve ser completada antes de avançar para a próxima, garantindo qualidade e estabilidade.
 
 **Última atualização**: Janeiro 2025
-**Versão do Roadmap**: 1.1
+**Versão do Roadmap**: 1.2
 
 ### 🎉 Marcos Importantes
 - **✅ Fase 1: Finalização do Core** - Janeiro 2025
@@ -304,5 +360,14 @@ Este roadmap serve como guia para o desenvolvimento contínuo do projeto. Cada f
   - ✅ Bloqueio de conta por tentativas falhadas
   - ✅ Sistema completo de logs de atividade
   - ✅ Testes end-to-end validados
-  - Rate limiting, validações robustas e documentação Swagger
-  - Integração completa com Prisma e SQLite
+  - ✅ Rate limiting, validações robustas e documentação Swagger
+  - ✅ Integração completa com Prisma e SQLite
+
+- **✅ Reestruturação da Documentação Swagger** - Janeiro 2025
+  - ✅ Modularização completa da documentação API
+  - ✅ Criação de 6 arquivos especializados para diferentes módulos
+  - ✅ Documentação abrangente para 35+ endpoints
+  - ✅ Implementação de filtros avançados, paginação e segurança JWT
+  - ✅ Substituição de código inline por arquitetura modular
+  - ✅ Melhoria significativa na manutenibilidade e organização
+  - ✅ Swagger UI totalmente funcional e acessível
