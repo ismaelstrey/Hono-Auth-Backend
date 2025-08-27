@@ -1,4 +1,5 @@
 const { PrismaClient } = require('@prisma/client')
+const bcrypt = require('bcryptjs')
 
 const prisma = new PrismaClient()
 
@@ -8,11 +9,11 @@ async function createTestUser() {
   try {
     // Verifica se o usuário já existe
     const existingUser = await prisma.user.findUnique({
-      where: { email: 'admin@example.com' }
+      where: { email: 'test-avatar@example.com' }
     })
     
     if (existingUser) {
-      console.log('✅ Usuário admin@example.com já existe!')
+      console.log('✅ Usuário test-avatar@example.com já existe!')
       console.log('ID:', existingUser.id)
       console.log('Nome:', existingUser.name)
       console.log('Email:', existingUser.email)
@@ -20,17 +21,25 @@ async function createTestUser() {
       return
     }
     
-    // Hash da senha Admin123! usando bcrypt com salt 10
-    // $2b$10$92IXUNpkjO0rOQ5byMi.Ye4oKoEa3Ro9llC/.og/at2.uheWG/igi (password)
-    const hashedPassword = '$2b$10$92IXUNpkjO0rOQ5byMi.Ye4oKoEa3Ro9llC/.og/at2.uheWG/igi'
+    // Hash da senha
+    const hashedPassword = await bcrypt.hash('TestPassword123!', 10)
+    
+    // Buscar role de usuário
+    const userRole = await prisma.role.findFirst({
+      where: { name: 'user' }
+    })
+    
+    if (!userRole) {
+      throw new Error('Role "user" não encontrada')
+    }
     
     // Cria o usuário
     const user = await prisma.user.create({
       data: {
-        name: 'Administrador',
-        email: 'admin@example.com',
+        name: 'Test Avatar User',
+        email: 'test-avatar@example.com',
         password: hashedPassword,
-        role: 'ADMIN',
+        roleId: userRole.id,
         isActive: true,
         emailVerified: true
       }

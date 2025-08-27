@@ -16,7 +16,8 @@ async function registerUser() {
   const userData = {
     name: `Test User ${randomId}`,
     email: `test${randomId}@example.com`,
-    password: 'Test123!'
+    password: 'Test123!',
+    confirmPassword: 'Test123!'
   }
   
   const response = await fetch(`${BASE_URL}/api/auth/register`, {

@@ -1,6 +1,7 @@
 import { LogRepository } from '@/repositories/logRepository'
 import { prisma } from '@/config/database'
 import type { LogEntry, LogFilters, LogStats, LogLevel } from '@/types'
+import type { PaginationParams, PaginatedResult, SortParams, FilterParams } from '@/utils/pagination'
 import { InternalServerError } from '@/utils/errors'
 import { env } from '@/config/env'
 
@@ -177,6 +178,21 @@ export class LogService {
       }
     } catch (error) {
       throw new InternalServerError('Erro ao buscar logs', error)
+    }
+  }
+
+  /**
+   * Busca logs com paginação, ordenação e filtros avançados
+   */
+  async getLogsAdvanced(
+    pagination: PaginationParams,
+    sort: SortParams,
+    filters: FilterParams
+  ): Promise<PaginatedResult<LogEntry>> {
+    try {
+      return await this.logRepository.findManyAdvanced(pagination, sort, filters)
+    } catch (error) {
+      throw new InternalServerError('Erro ao buscar logs avançados', error)
     }
   }
 

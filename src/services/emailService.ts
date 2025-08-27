@@ -1,4 +1,5 @@
 import crypto from 'crypto';
+import nodemailer from 'nodemailer';
 import { prisma } from '../config/database';
 import { config } from '../config/env';
 
@@ -19,7 +20,51 @@ export interface SendPasswordResetEmailData {
   token: string;
 }
 
+export interface SendNotificationEmailData {
+  email: string;
+  name: string;
+  subject: string;
+  htmlContent: string;
+  textContent?: string;
+}
+
 class EmailService {
+  private transporter: nodemailer.Transporter | null = null;
+
+  constructor() {
+    this.initializeTransporter();
+  }
+
+  /**
+   * Inicializa o transporter do Nodemailer
+   */
+  private initializeTransporter(): void {
+    // Só configura o transporter se as variáveis de SMTP estiverem definidas
+    if (config.SMTP_HOST && config.SMTP_PORT && config.SMTP_USER && config.SMTP_PASS) {
+      this.transporter = nodemailer.createTransporter({
+        host: config.SMTP_HOST,
+        port: config.SMTP_PORT,
+        secure: config.SMTP_PORT === 465, // true para 465, false para outras portas
+        auth: {
+          user: config.SMTP_USER,
+          pass: config.SMTP_PASS,
+        },
+      });
+
+      // Verifica a conexão SMTP
+      this.transporter.verify((error, success) => {
+        if (error) {
+          console.warn('⚠️ Erro na configuração SMTP:', error.message);
+          console.warn('📧 Emails serão simulados no console');
+          this.transporter = null;
+        } else {
+          console.log('✅ Servidor SMTP configurado com sucesso');
+        }
+      });
+    } else {
+      console.log('📧 Configurações SMTP não encontradas. Emails serão simulados no console.');
+    }
+  }
   /**
    * Gera um token de verificação de email seguro
    */
@@ -330,50 +375,51 @@ class EmailService {
   }
 
   /**
-   * Simula o envio de email (para desenvolvimento)
-   * Em produção, integrar com serviço real como SendGrid, Nodemailer, etc.
+   * Envia email de verificação
    */
   async sendVerificationEmail(data: SendVerificationEmailData): Promise<EmailVerificationResult> {
     try {
       const verificationLink = this.generateVerificationLink(data.token);
       const htmlContent = this.generateVerificationEmailTemplate(data.name, verificationLink);
+      const subject = 'Verificação de Email - Confirme sua conta';
 
-      // Em desenvolvimento, apenas logamos o email
-      if (process.env.NODE_ENV === 'development') {
-        console.log('\n📧 EMAIL DE VERIFICAÇÃO SIMULADO:');
-        console.log('Para:', data.email);
-        console.log('Nome:', data.name);
-        console.log('Token:', data.token);
-        console.log('Link de verificação:', verificationLink);
-        console.log('\n--- CONTEÚDO DO EMAIL ---');
-        console.log(htmlContent);
-        console.log('--- FIM DO EMAIL ---\n');
+      // Se o transporter estiver configurado, envia email real
+      if (this.transporter) {
+        await this.transporter.sendMail({
+          from: config.SMTP_FROM || config.SMTP_USER,
+          to: data.email,
+          subject: subject,
+          html: htmlContent,
+          text: `Olá ${data.name}, clique no link para verificar seu email: ${verificationLink}`
+        });
 
+        console.log(`✅ Email de verificação enviado para: ${data.email}`);
         return {
           success: true,
-          message: 'Email de verificação enviado com sucesso (modo desenvolvimento)'
+          message: 'Email de verificação enviado com sucesso'
         };
       }
 
-      // TODO: Implementar envio real de email em produção
-      // Exemplo com Nodemailer:
-      // const transporter = nodemailer.createTransporter(...);
-      // await transporter.sendMail({
-      //   from: config.email.from,
-      //   to: data.email,
-      //   subject: 'Verificação de Email',
-      //   html: htmlContent
-      // });
+      // Fallback: simula o envio no console
+      console.log('\n📧 EMAIL DE VERIFICAÇÃO SIMULADO:');
+      console.log('Para:', data.email);
+      console.log('Nome:', data.name);
+      console.log('Assunto:', subject);
+      console.log('Token:', data.token);
+      console.log('Link de verificação:', verificationLink);
+      console.log('\n--- CONTEÚDO DO EMAIL ---');
+      console.log(htmlContent);
+      console.log('--- FIM DO EMAIL ---\n');
 
       return {
         success: true,
-        message: 'Email de verificação enviado com sucesso'
+        message: 'Email de verificação enviado com sucesso (simulado)'
       };
     } catch (error) {
       console.error('Erro ao enviar email de verificação:', error);
       return {
         success: false,
-        message: 'Erro interno do servidor ao enviar email'
+        message: 'Erro ao enviar email de verificação'
       };
     }
   }
@@ -385,43 +431,89 @@ class EmailService {
     try {
       const resetLink = this.generatePasswordResetLink(data.token);
       const htmlContent = this.generatePasswordResetEmailTemplate(data.name, resetLink);
+      const subject = 'Redefinição de Senha - Recupere sua conta';
 
-      // Em desenvolvimento, apenas logamos o email
-      if (process.env.NODE_ENV === 'development') {
-        console.log('\n🔐 EMAIL DE RESET DE SENHA SIMULADO:');
-        console.log('Para:', data.email);
-        console.log('Nome:', data.name);
-        console.log('Token:', data.token);
-        console.log('Link de reset:', resetLink);
-        console.log('\n--- CONTEÚDO DO EMAIL ---');
-        console.log(htmlContent);
-        console.log('--- FIM DO EMAIL ---\n');
+      // Se o transporter estiver configurado, envia email real
+      if (this.transporter) {
+        await this.transporter.sendMail({
+          from: config.SMTP_FROM || config.SMTP_USER,
+          to: data.email,
+          subject: subject,
+          html: htmlContent,
+          text: `Olá ${data.name}, clique no link para redefinir sua senha: ${resetLink}`
+        });
 
+        console.log(`✅ Email de reset de senha enviado para: ${data.email}`);
         return {
           success: true,
-          message: 'Email de reset de senha enviado com sucesso (modo desenvolvimento)'
+          message: 'Email de reset de senha enviado com sucesso'
         };
       }
 
-      // TODO: Implementar envio real de email em produção
-      // Exemplo com Nodemailer:
-      // const transporter = nodemailer.createTransporter(...);
-      // await transporter.sendMail({
-      //   from: config.email.from,
-      //   to: data.email,
-      //   subject: 'Reset de Senha',
-      //   html: htmlContent
-      // });
+      // Fallback: simula o envio no console
+      console.log('\n🔐 EMAIL DE RESET DE SENHA SIMULADO:');
+      console.log('Para:', data.email);
+      console.log('Nome:', data.name);
+      console.log('Assunto:', subject);
+      console.log('Token:', data.token);
+      console.log('Link de reset:', resetLink);
+      console.log('\n--- CONTEÚDO DO EMAIL ---');
+      console.log(htmlContent);
+      console.log('--- FIM DO EMAIL ---\n');
 
       return {
         success: true,
-        message: 'Email de reset de senha enviado com sucesso'
+        message: 'Email de reset de senha enviado com sucesso (simulado)'
       };
     } catch (error) {
       console.error('Erro ao enviar email de reset de senha:', error);
       return {
         success: false,
         message: 'Erro ao enviar email de reset de senha'
+      };
+    }
+  }
+
+  /**
+   * Envia email de notificação genérico
+   */
+  async sendNotificationEmail(data: SendNotificationEmailData): Promise<EmailVerificationResult> {
+    try {
+      // Se o transporter estiver configurado, envia email real
+      if (this.transporter) {
+        await this.transporter.sendMail({
+          from: config.SMTP_FROM || config.SMTP_USER,
+          to: data.email,
+          subject: data.subject,
+          html: data.htmlContent,
+          text: data.textContent || data.subject
+        });
+
+        console.log(`✅ Email de notificação enviado para: ${data.email}`);
+        return {
+          success: true,
+          message: 'Email de notificação enviado com sucesso'
+        };
+      }
+
+      // Fallback: simula o envio no console
+      console.log('\n📧 EMAIL DE NOTIFICAÇÃO SIMULADO:');
+      console.log('Para:', data.email);
+      console.log('Nome:', data.name);
+      console.log('Assunto:', data.subject);
+      console.log('\n--- CONTEÚDO DO EMAIL ---');
+      console.log(data.htmlContent);
+      console.log('--- FIM DO EMAIL ---\n');
+
+      return {
+        success: true,
+        message: 'Email de notificação enviado com sucesso (simulado)'
+      };
+    } catch (error) {
+      console.error('Erro ao enviar email de notificação:', error);
+      return {
+        success: false,
+        message: 'Erro ao enviar email de notificação'
       };
     }
   }

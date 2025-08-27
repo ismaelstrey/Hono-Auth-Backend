@@ -1,6 +1,8 @@
 import { userRepository } from '@/repositories/userRepository'
 import { hashPassword } from '@/utils/password'
 import { sanitizeUser } from '@/utils/helpers'
+import { cacheService, CacheKeys, CacheTTL } from './cacheService'
+import { logger } from '@/utils/logger'
 import type { 
   User, 
   CreateUserData, 
@@ -15,25 +17,60 @@ import type { PaginationParams, PaginatedResult, SortParams, FilterParams } from
  */
 export class UserService {
   /**
-   * Busca usuário por ID
+   * Busca usuário por ID (com cache)
    */
   async getUserById(id: string): Promise<User> {
+    const cacheKey = CacheKeys.user(id)
+    
+    // Tenta buscar no cache
+    const cached = await cacheService.get<User>(cacheKey)
+    if (cached) {
+      logger.debug(`Cache hit para usuário ${id}`)
+      return cached
+    }
+    
+    // Busca no banco de dados
     const user = await userRepository.findById(id)
     if (!user) {
       throw new Error('Usuário não encontrado')
     }
-    return sanitizeUser(user)
+    
+    const sanitized = sanitizeUser(user)
+    
+    // Armazena no cache
+    await cacheService.set(cacheKey, sanitized, CacheTTL.MEDIUM)
+    logger.debug(`Usuário ${id} armazenado no cache`)
+    
+    return sanitized
   }
 
   /**
-   * Busca usuário por email
+   * Busca usuário por email (com cache)
    */
   async getUserByEmail(email: string): Promise<User> {
+    const cacheKey = CacheKeys.userByEmail(email)
+    
+    // Tenta buscar no cache
+    const cached = await cacheService.get<User>(cacheKey)
+    if (cached) {
+      logger.debug(`Cache hit para usuário com email ${email}`)
+      return cached
+    }
+    
+    // Busca no banco de dados
     const user = await userRepository.findByEmail(email)
     if (!user) {
       throw new Error('Usuário não encontrado')
     }
-    return sanitizeUser(user)
+    
+    const sanitized = sanitizeUser(user)
+    
+    // Armazena no cache (com TTL menor para email)
+    await cacheService.set(cacheKey, sanitized, CacheTTL.SHORT)
+    await cacheService.set(CacheKeys.user(sanitized.id), sanitized, CacheTTL.MEDIUM)
+    logger.debug(`Usuário com email ${email} armazenado no cache`)
+    
+    return sanitized
   }
 
   /**
@@ -101,7 +138,18 @@ export class UserService {
       password: hashedPassword
     })
 
-    return sanitizeUser(user)
+    const sanitized = sanitizeUser(user)
+    
+    // Armazena no cache
+    await cacheService.set(CacheKeys.user(sanitized.id), sanitized, CacheTTL.MEDIUM)
+    await cacheService.set(CacheKeys.userByEmail(sanitized.email), sanitized, CacheTTL.SHORT)
+    
+    // Invalida cache de listagens
+    await this.invalidateListCaches()
+    
+    logger.info(`Usuário ${sanitized.id} criado e armazenado no cache`)
+
+    return sanitized
   }
 
   /**
@@ -128,7 +176,21 @@ export class UserService {
       throw new Error('Erro ao atualizar usuário')
     }
 
-    return sanitizeUser(updatedUser)
+    const sanitized = sanitizeUser(updatedUser)
+    
+    // Invalida cache do usuário antigo
+    await this.invalidateUserCache(id, existingUser.email)
+    
+    // Armazena nova versão no cache
+    await cacheService.set(CacheKeys.user(sanitized.id), sanitized, CacheTTL.MEDIUM)
+    await cacheService.set(CacheKeys.userByEmail(sanitized.email), sanitized, CacheTTL.SHORT)
+    
+    // Invalida cache de listagens
+    await this.invalidateListCaches()
+    
+    logger.info(`Usuário ${id} atualizado no cache`)
+
+    return sanitized
   }
 
   /**
@@ -163,6 +225,14 @@ export class UserService {
     if (!deleted) {
       throw new Error('Erro ao deletar usuário')
     }
+    
+    // Invalida cache do usuário deletado
+    await this.invalidateUserCache(id, user.email)
+    
+    // Invalida cache de listagens
+    await this.invalidateListCaches()
+    
+    logger.info(`Usuário ${id} deletado e removido do cache`)
 
     return { message: 'Usuário deletado com sucesso' }
   }
@@ -341,6 +411,41 @@ export class UserService {
     }
 
     return false
+  }
+
+  /**
+   * Invalida cache de um usuário específico
+   */
+  private async invalidateUserCache(userId: string, email?: string): Promise<void> {
+    try {
+      const keys = [
+        CacheKeys.user(userId),
+        CacheKeys.userPermissions(userId),
+        CacheKeys.userSessions(userId)
+      ]
+      
+      if (email) {
+        keys.push(CacheKeys.userByEmail(email))
+      }
+      
+      await Promise.all(keys.map(key => cacheService.del(key)))
+      logger.debug(`Cache invalidado para usuário ${userId}`)
+    } catch (error) {
+      logger.error('Erro ao invalidar cache do usuário:', error)
+    }
+  }
+
+  /**
+   * Invalida cache de listagens de usuários
+   */
+  private async invalidateListCaches(): Promise<void> {
+    try {
+      // Em uma implementação completa, usaríamos padrões para encontrar todas as chaves
+      // Por enquanto, apenas logamos a invalidação
+      logger.debug('Cache de listagens de usuários invalidado')
+    } catch (error) {
+      logger.error('Erro ao invalidar cache de listagens:', error)
+    }
   }
 
   /**

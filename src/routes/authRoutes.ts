@@ -5,6 +5,11 @@ import { authMiddleware, optionalAuth } from '@/middlewares/auth'
 import { rateLimitAuth, rateLimitPasswordReset, rateLimitRegistration } from '@/middlewares/rateLimiter'
 import { loggingMiddleware } from '@/middlewares/logging'
 import {
+  userCache,
+  cacheInvalidation,
+  cacheHeaders
+} from '@/middlewares/cache'
+import {
   registerSchema,
   loginSchema,
   refreshTokenSchema,
@@ -87,20 +92,21 @@ authRoutes.use('/change-password', authMiddleware)
 authRoutes.use('/token-info', authMiddleware)
 
 // Logout
-authRoutes.post('/logout', AuthController.logout)
+authRoutes.post('/logout', cacheInvalidation('users'), AuthController.logout)
 
 // Perfil do usuário autenticado
-authRoutes.get('/profile', AuthController.getProfile)
+authRoutes.get('/profile', userCache(), cacheHeaders(), AuthController.getProfile)
 
 // Alterar senha
 authRoutes.post(
   '/change-password',
   zValidator('json', changePasswordSchema),
+  cacheInvalidation('users'),
   AuthController.handleChangePassword
 )
 
 // Informações do token
-authRoutes.get('/token-info', AuthController.getTokenInfo)
+authRoutes.get('/token-info', userCache(300), cacheHeaders(300), AuthController.getTokenInfo)
 
 // Rota de health check específica para auth
 authRoutes.get('/health', (c) => {

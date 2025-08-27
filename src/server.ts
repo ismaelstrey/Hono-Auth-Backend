@@ -19,6 +19,7 @@ import { userRoutes } from '@/routes/userRoutes'
 import { logRoutes } from '@/routes/logRoutes'
 import { profileRoutes } from '@/routes/profileRoutes'
 import { notificationRoutes } from '@/routes/notificationRoutes'
+import { roleRoutes } from '@/routes/roleRoutes'
 import { env, config } from '@/config/env'
 import { connectDatabase } from '@/config/database'
 
@@ -87,6 +88,7 @@ app.route('/api/users', userRoutes)
 app.route('/api/logs', logRoutes)
 app.route('/api/profiles', profileRoutes)
 app.route('/api/notifications', notificationRoutes)
+app.route('/api/roles', roleRoutes)
 
 // Documentação Swagger
 if (config.features.swagger) {

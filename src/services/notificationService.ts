@@ -1,6 +1,9 @@
 import { notificationRepository } from '@/repositories/notificationRepository'
 import { emailService } from '@/services/emailService'
 import { LogService } from '@/services/logService'
+import { cacheService, CacheKeys, CacheTTL } from '@/services/cacheService'
+import { logger } from '@/utils/logger'
+import type { PaginationParams, PaginatedResult, SortParams, FilterParams } from '@/utils/pagination'
 import type {
   Notification,
   NotificationType,
@@ -227,6 +230,17 @@ export class NotificationService {
   }
 
   /**
+   * Busca notificações com paginação, ordenação e filtros avançados
+   */
+  async getNotificationsAdvanced(
+    pagination: PaginationParams,
+    sort: SortParams = {},
+    filters: FilterParams = {}
+  ): Promise<PaginatedResult<Notification>> {
+    return await notificationRepository.findManyAdvanced(pagination, sort, filters)
+  }
+
+  /**
    * Marca notificação como lida
    */
   async markAsRead(notificationId: string, userId: string): Promise<Notification | null> {
@@ -277,12 +291,31 @@ export class NotificationService {
    * Busca preferências do usuário
    */
   async getUserPreferences(userId: string, typeId?: string): Promise<NotificationPreference | NotificationPreference[]> {
-    if (typeId) {
-      const preference = await notificationRepository.findUserPreference(userId, typeId)
-      return preference || this.getDefaultPreference(userId, typeId)
+    const cacheKey = typeId 
+      ? `${CacheKeys.NOTIFICATIONS.USER_PREFERENCES}:${userId}:${typeId}`
+      : `${CacheKeys.NOTIFICATIONS.USER_PREFERENCES}:${userId}`
+    
+    // Tentar buscar do cache
+    const cached = await cacheService.get(cacheKey)
+    if (cached) {
+      logger.debug('Cache hit para preferências de notificação', { userId, typeId })
+      return cached
     }
     
-    return await notificationRepository.findUserPreferences(userId)
+    let result: NotificationPreference | NotificationPreference[]
+    
+    if (typeId) {
+      const preference = await notificationRepository.findUserPreference(userId, typeId)
+      result = preference || this.getDefaultPreference(userId, typeId)
+    } else {
+      result = await notificationRepository.findUserPreferences(userId)
+    }
+    
+    // Armazenar no cache
+    await cacheService.set(cacheKey, result, CacheTTL.MEDIUM)
+    logger.debug('Cache miss para preferências de notificação', { userId, typeId })
+    
+    return result
   }
 
   /**
@@ -293,7 +326,12 @@ export class NotificationService {
     typeId: string,
     data: UpdateNotificationPreferenceData
   ): Promise<NotificationPreference> {
-    return await notificationRepository.upsertUserPreference(userId, typeId, data)
+    const result = await notificationRepository.upsertUserPreference(userId, typeId, data)
+    
+    // Invalidar cache das preferências
+    await this.invalidateUserPreferencesCache(userId, typeId)
+    
+    return result
   }
 
   // === MÉTODOS PRIVADOS ===
@@ -384,11 +422,12 @@ export class NotificationService {
     template: ProcessedTemplate
   ): Promise<SendNotificationResult> {
     try {
-      // Integra com o emailService existente
-      const result = await emailService.sendVerificationEmail({
+      const result = await emailService.sendNotificationEmail({
         email: (notification as any).user.email,
         name: (notification as any).user.name,
-        token: '' // Para notificações gerais, não precisamos de token
+        subject: template.subject || template.title || 'Notificação',
+        htmlContent: template.htmlBody || `<p>${template.body}</p>`,
+        textContent: template.body
       })
 
       return {
@@ -474,6 +513,22 @@ export class NotificationService {
     })
 
     return deletedCount
+  }
+
+  /**
+   * Invalida cache de preferências do usuário
+   */
+  private async invalidateUserPreferencesCache(userId: string, typeId?: string): Promise<void> {
+    const keys = [
+      `${CacheKeys.NOTIFICATIONS.USER_PREFERENCES}:${userId}`,
+      `${CacheKeys.NOTIFICATIONS.USER_PREFERENCES}:${userId}:${typeId}`
+    ]
+    
+    for (const key of keys) {
+      await cacheService.delete(key)
+    }
+    
+    logger.debug('Cache de preferências invalidado', { userId, typeId })
   }
 }
 

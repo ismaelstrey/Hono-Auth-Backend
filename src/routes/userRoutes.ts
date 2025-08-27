@@ -9,6 +9,12 @@ import {
 } from '@/middlewares/auth'
 import { rateLimitPublic } from '@/middlewares/rateLimiter'
 import { loggingMiddleware } from '@/middlewares/logging'
+import { 
+  paginatedCache, 
+  userCache, 
+  cacheInvalidation,
+  cacheHeaders 
+} from '@/middlewares/cache'
 import {
   createUserSchema,
   updateUserSchema,
@@ -37,17 +43,24 @@ userRoutes.use('*', authMiddleware)
 userRoutes.get(
   '/search',
   rateLimitPublic,
+  paginatedCache(), // Cache para listagens paginadas
   zValidator('query', userQuerySchema),
   UserController.handleListUsers
 )
 
 // Obter configurações do próprio usuário
-userRoutes.get('/settings', UserController.handleGetSettings)
+userRoutes.get(
+  '/settings', 
+  userCache(), // Cache para dados do usuário
+  cacheHeaders(), // Headers de cache
+  UserController.handleGetSettings
+)
 
 // Atualizar configurações do próprio usuário
 userRoutes.put(
   '/settings',
   zValidator('json', userSettingsSchema),
+  cacheInvalidation('users'), // Invalida cache após atualização
   UserController.handleUpdateSettings
 )
 
@@ -55,6 +68,7 @@ userRoutes.put(
 userRoutes.put(
   '/profile',
   zValidator('json', updateProfileSchema),
+  cacheInvalidation('users'), // Invalida cache após atualização
   UserController.handleUpdateProfile
 )
 
@@ -65,18 +79,34 @@ userRoutes.use('/role/*', requireAdminOrModerator)
 userRoutes.use('/bulk', requireAdminOrModerator)
 
 // Estatísticas de usuários (admin/moderador)
-userRoutes.get('/stats', UserController.getUserStats)
+userRoutes.get(
+  '/stats', 
+  userCache(3600), // Cache por 1 hora para estatísticas
+  cacheHeaders(3600),
+  UserController.getUserStats
+)
 
 // Usuários recentemente ativos (admin/moderador)
-userRoutes.get('/recent', UserController.getRecentlyActiveUsers)
+userRoutes.get(
+  '/recent', 
+  userCache(300), // Cache por 5 minutos para dados recentes
+  cacheHeaders(300),
+  UserController.getRecentlyActiveUsers
+)
 
 // Usuários por role (admin/moderador)
-userRoutes.get('/role/:role', UserController.getUsersByRole)
+userRoutes.get(
+  '/role/:role', 
+  userCache(900), // Cache por 15 minutos
+  cacheHeaders(900),
+  UserController.getUsersByRole
+)
 
 // Operações em lote (admin/moderador)
 userRoutes.post(
   '/bulk',
   zValidator('json', bulkUserOperationSchema),
+  cacheInvalidation('users'), // Invalida cache após operações em lote
   UserController.handleBulkOperation
 )
 
@@ -87,6 +117,7 @@ userRoutes.use('/create', requireAdmin)
 userRoutes.post(
   '/create',
   zValidator('json', createUserSchema),
+  cacheInvalidation('users'), // Invalida cache após criação
   UserController.handleCreateUser
 )
 
@@ -94,6 +125,7 @@ userRoutes.post(
 userRoutes.get(
   '/',
   requireAdminOrModerator,
+  paginatedCache(), // Cache para listagens paginadas
   zValidator('query', userQuerySchema),
   UserController.handleListUsers
 )
@@ -105,6 +137,8 @@ userRoutes.use('/:id', requireOwnershipOrAdmin)
 userRoutes.get(
   '/:id',
   zValidator('param', userIdSchema),
+  userCache(), // Cache para dados do usuário
+  cacheHeaders(),
   UserController.handleGetUserById
 )
 
@@ -113,6 +147,7 @@ userRoutes.put(
   '/:id',
   zValidator('param', userIdSchema),
   zValidator('json', updateUserSchema),
+  cacheInvalidation('users'), // Invalida cache após atualização
   UserController.handleUpdateUser
 )
 
@@ -125,6 +160,7 @@ userRoutes.use('/:id/change-role', requireAdmin)
 userRoutes.delete(
   '/:id/delete',
   zValidator('param', userIdSchema),
+  cacheInvalidation('users'), // Invalida cache após exclusão
   UserController.handleDeleteUser
 )
 
@@ -132,6 +168,7 @@ userRoutes.delete(
 userRoutes.patch(
   '/:id/toggle-status',
   zValidator('param', userIdSchema),
+  cacheInvalidation('users'), // Invalida cache após mudança de status
   UserController.handleToggleUserStatus
 )
 

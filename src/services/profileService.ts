@@ -3,6 +3,7 @@ import { profileRepository, CreateProfileData, UpdateProfileData, ProfileWithUse
 import { ValidationError, NotFoundError, ConflictError, InternalServerError } from '@/utils/errors'
 import { logger } from '@/utils/logger'
 import { deleteOldAvatar } from '@/middlewares/upload'
+import type { PaginationParams, PaginatedResult, SortParams, FilterParams } from '@/utils/pagination'
 
 export interface ProfileData {
   firstName?: string
@@ -10,6 +11,33 @@ export interface ProfileData {
   bio?: string
   phone?: string
   dateOfBirth?: string // ISO string
+  
+  // Informações profissionais
+  company?: string
+  jobTitle?: string
+  website?: string
+  location?: string
+  
+  // Informações adicionais
+  languages?: string[] // Array de idiomas
+  skills?: string[] // Array de habilidades
+  interests?: string[] // Array de interesses
+  education?: {
+    degree?: string
+    institution?: string
+    year?: number
+    description?: string
+  }[]
+  experience?: {
+    company?: string
+    position?: string
+    startDate?: string
+    endDate?: string
+    description?: string
+    current?: boolean
+  }[]
+  
+  // Configurações e preferências
   address?: {
     street?: string
     city?: string
@@ -37,7 +65,14 @@ export interface ProfileData {
     twitter?: string
     github?: string
     instagram?: string
+    facebook?: string
+    youtube?: string
   }
+  
+  // Configurações de privacidade
+  isPublic?: boolean
+  showEmail?: boolean
+  showPhone?: boolean
 }
 
 export interface ProfileResponse {
@@ -50,9 +85,30 @@ export interface ProfileResponse {
   bio: string | null
   phone: string | null
   dateOfBirth: Date | null
+  
+  // Informações profissionais
+  company: string | null
+  jobTitle: string | null
+  website: string | null
+  location: string | null
+  
+  // Informações adicionais
+  languages: string[] | null
+  skills: string[] | null
+  interests: string[] | null
+  education: any
+  experience: any
+  
+  // Configurações e preferências
   address: any
   preferences: any
   socialLinks: any
+  
+  // Configurações de privacidade
+  isPublic: boolean
+  showEmail: boolean
+  showPhone: boolean
+  
   createdAt: Date
   updatedAt: Date
   user: {
@@ -86,9 +142,29 @@ class ProfileService {
         bio: data.bio,
         phone: data.phone,
         dateOfBirth: data.dateOfBirth ? new Date(data.dateOfBirth) : undefined,
+        
+        // Informações profissionais
+        company: data.company,
+        jobTitle: data.jobTitle,
+        website: data.website,
+        location: data.location,
+        
+        // Informações adicionais
+        languages: data.languages ? JSON.stringify(data.languages) : undefined,
+        skills: data.skills ? JSON.stringify(data.skills) : undefined,
+        interests: data.interests ? JSON.stringify(data.interests) : undefined,
+        education: data.education ? JSON.stringify(data.education) : undefined,
+        experience: data.experience ? JSON.stringify(data.experience) : undefined,
+        
+        // Configurações e preferências
         address: data.address ? JSON.stringify(data.address) : undefined,
         preferences: data.preferences ? JSON.stringify(data.preferences) : undefined,
-        socialLinks: data.socialLinks ? JSON.stringify(data.socialLinks) : undefined
+        socialLinks: data.socialLinks ? JSON.stringify(data.socialLinks) : undefined,
+        
+        // Configurações de privacidade
+        isPublic: data.isPublic ?? true,
+        showEmail: data.showEmail ?? false,
+        showPhone: data.showPhone ?? false
       }
 
       const profile = await profileRepository.create(createData)
@@ -166,9 +242,29 @@ class ProfileService {
         bio: data.bio,
         phone: data.phone,
         dateOfBirth: data.dateOfBirth ? new Date(data.dateOfBirth) : undefined,
+        
+        // Informações profissionais
+        company: data.company,
+        jobTitle: data.jobTitle,
+        website: data.website,
+        location: data.location,
+        
+        // Informações adicionais
+        languages: data.languages ? JSON.stringify(data.languages) : undefined,
+        skills: data.skills ? JSON.stringify(data.skills) : undefined,
+        interests: data.interests ? JSON.stringify(data.interests) : undefined,
+        education: data.education ? JSON.stringify(data.education) : undefined,
+        experience: data.experience ? JSON.stringify(data.experience) : undefined,
+        
+        // Configurações e preferências
         address: data.address ? JSON.stringify(data.address) : undefined,
         preferences: data.preferences ? JSON.stringify(data.preferences) : undefined,
-        socialLinks: data.socialLinks ? JSON.stringify(data.socialLinks) : undefined
+        socialLinks: data.socialLinks ? JSON.stringify(data.socialLinks) : undefined,
+        
+        // Configurações de privacidade
+        isPublic: data.isPublic,
+        showEmail: data.showEmail,
+        showPhone: data.showPhone
       }
 
       await profileRepository.update(userId, updateData)
@@ -196,10 +292,15 @@ class ProfileService {
    */
   async updateAvatar(userId: string, avatarUrl: string): Promise<ProfileResponse> {
     try {
-      // Verificar se perfil existe
-      const existingProfile = await profileRepository.findByUserId(userId)
+      // Verificar se perfil existe, se não existir, criar um básico
+      let existingProfile = await profileRepository.findByUserId(userId)
       if (!existingProfile) {
-        throw new NotFoundError('Perfil não encontrado')
+        logger.info(`Criando perfil básico para usuário ${userId} durante upload de avatar`)
+        const basicProfile = await profileRepository.create({ userId })
+        existingProfile = await profileRepository.findByUserId(userId)
+        if (!existingProfile) {
+          throw new InternalServerError('Erro ao criar perfil básico')
+        }
       }
 
       // Deletar avatar antigo se existir
@@ -267,7 +368,7 @@ class ProfileService {
   }
 
   /**
-   * Listar perfis com paginação e busca
+   * Listar perfis com paginação e busca (método legado)
    */
   async listProfiles({
     page = 1,
@@ -300,6 +401,27 @@ class ProfileService {
       }
     } catch (error) {
       logger.error('Erro ao listar perfis', { page, limit, search, error })
+      throw new InternalServerError('Erro ao listar perfis')
+    }
+  }
+
+  /**
+   * Listar perfis com sistema de paginação padronizado
+   */
+  async listProfilesAdvanced(
+    pagination: PaginationParams,
+    sort: SortParams = {},
+    filters: FilterParams = {}
+  ): Promise<PaginatedResult<ProfileResponse>> {
+    try {
+      const result = await profileRepository.findManyAdvanced(pagination, sort, filters)
+      
+      return {
+        ...result,
+        data: result.data.map(profile => this.formatProfileResponse(profile))
+      }
+    } catch (error) {
+      logger.error('Erro ao listar perfis avançado', { pagination, sort, filters, error })
       throw new InternalServerError('Erro ao listar perfis')
     }
   }
@@ -431,9 +553,30 @@ class ProfileService {
       bio: profile.bio,
       phone: profile.phone,
       dateOfBirth: profile.dateOfBirth,
+      
+      // Informações profissionais
+      company: profile.company,
+      jobTitle: profile.jobTitle,
+      website: profile.website,
+      location: profile.location,
+      
+      // Informações adicionais
+      languages: profile.languages ? JSON.parse(profile.languages) : null,
+      skills: profile.skills ? JSON.parse(profile.skills) : null,
+      interests: profile.interests ? JSON.parse(profile.interests) : null,
+      education: profile.education ? JSON.parse(profile.education) : null,
+      experience: profile.experience ? JSON.parse(profile.experience) : null,
+      
+      // Configurações e preferências
       address: profile.address ? JSON.parse(profile.address) : null,
       preferences: profile.preferences ? JSON.parse(profile.preferences) : null,
       socialLinks: profile.socialLinks ? JSON.parse(profile.socialLinks) : null,
+      
+      // Configurações de privacidade
+      isPublic: profile.isPublic,
+      showEmail: profile.showEmail,
+      showPhone: profile.showPhone,
+      
       createdAt: profile.createdAt,
       updatedAt: profile.updatedAt,
       user: {

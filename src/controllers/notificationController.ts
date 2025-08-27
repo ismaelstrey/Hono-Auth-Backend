@@ -2,6 +2,8 @@ import { Context } from 'hono'
 import { z } from 'zod'
 import { notificationService } from '@/services/notificationService'
 import { LogService } from '@/services/logService'
+import { extractPaginationParams, extractSortParams, extractFilterParams } from '@/utils/pagination'
+import { successResponse, errorResponse } from '@/utils/helpers'
 import type {
   CreateNotificationData,
   CreateNotificationTypeData,
@@ -113,19 +115,14 @@ export class NotificationController {
   async list(c: Context) {
     try {
       const query = c.req.query()
-      const filters = notificationFiltersSchema.parse(query)
       
-      const notifications = await notificationService.getNotifications(filters as NotificationFilters)
+      const pagination = extractPaginationParams(query)
+      const sort = extractSortParams(query)
+      const filters = extractFilterParams(query, ['userId', 'typeId', 'channel', 'status', 'priority'])
       
-      return c.json({
-        success: true,
-        data: notifications,
-        pagination: {
-          limit: filters.limit,
-          offset: filters.offset,
-          total: notifications.length
-        }
-      })
+      const result = await notificationService.getNotificationsAdvanced(pagination, sort, filters)
+      
+      return c.json(successResponse(result))
     } catch (error) {
       await logService.error('Erro ao listar notificações', {
         error: error instanceof Error ? error.message : 'Erro desconhecido',
@@ -138,18 +135,8 @@ export class NotificationController {
         ip: c.req.header('x-forwarded-for') || c.req.header('x-real-ip') || 'unknown'
       })
       
-      if (error instanceof z.ZodError) {
-        return c.json({
-          success: false,
-          message: 'Parâmetros inválidos',
-          errors: error.errors
-        }, 400)
-      }
-      
-      return c.json({
-        success: false,
-        message: 'Erro interno do servidor'
-      }, 500)
+      const message = error instanceof Error ? error.message : 'Erro interno do servidor'
+      return c.json(errorResponse(message), 500)
     }
   }
 

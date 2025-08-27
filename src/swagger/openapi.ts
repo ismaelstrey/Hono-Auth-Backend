@@ -4,6 +4,8 @@ import { userPaths } from './userPaths'
 import { profilePaths } from './profilePaths'
 import { notificationPaths } from './notificationPaths'
 import { logPaths } from './logPaths'
+import { rolePaths } from './rolePaths'
+import { roleSchemas } from './roleSchemas'
 
 /**
  * Configuração completa da documentação OpenAPI/Swagger
@@ -132,6 +134,21 @@ export const createOpenAPISpec = () => {
               format: 'uuid',
               description: 'ID do usuário proprietário'
             },
+            firstName: {
+              type: 'string',
+              description: 'Primeiro nome',
+              nullable: true
+            },
+            lastName: {
+              type: 'string',
+              description: 'Sobrenome',
+              nullable: true
+            },
+            fullName: {
+              type: 'string',
+              description: 'Nome completo',
+              nullable: true
+            },
             bio: {
               type: 'string',
               description: 'Biografia do usuário',
@@ -148,9 +165,22 @@ export const createOpenAPISpec = () => {
               description: 'Telefone do usuário',
               nullable: true
             },
-            location: {
+            dateOfBirth: {
               type: 'string',
-              description: 'Localização do usuário',
+              format: 'date',
+              description: 'Data de nascimento',
+              nullable: true
+            },
+            
+            // Informações profissionais
+            company: {
+              type: 'string',
+              description: 'Empresa atual',
+              nullable: true
+            },
+            jobTitle: {
+              type: 'string',
+              description: 'Cargo/posição atual',
               nullable: true
             },
             website: {
@@ -159,39 +189,136 @@ export const createOpenAPISpec = () => {
               description: 'Website pessoal',
               nullable: true
             },
+            location: {
+              type: 'string',
+              description: 'Localização atual',
+              nullable: true
+            },
+            
+            // Informações adicionais
+            languages: {
+              type: 'array',
+              items: { type: 'string' },
+              description: 'Idiomas falados',
+              nullable: true
+            },
+            skills: {
+              type: 'array',
+              items: { type: 'string' },
+              description: 'Habilidades técnicas',
+              nullable: true
+            },
+            interests: {
+              type: 'array',
+              items: { type: 'string' },
+              description: 'Interesses pessoais',
+              nullable: true
+            },
+            education: {
+              type: 'array',
+              items: {
+                type: 'object',
+                properties: {
+                  degree: { type: 'string', nullable: true },
+                  institution: { type: 'string', nullable: true },
+                  year: { type: 'integer', nullable: true },
+                  description: { type: 'string', nullable: true }
+                }
+              },
+              description: 'Formação acadêmica',
+              nullable: true
+            },
+            experience: {
+              type: 'array',
+              items: {
+                type: 'object',
+                properties: {
+                  company: { type: 'string', nullable: true },
+                  position: { type: 'string', nullable: true },
+                  startDate: { type: 'string', format: 'date', nullable: true },
+                  endDate: { type: 'string', format: 'date', nullable: true },
+                  description: { type: 'string', nullable: true },
+                  current: { type: 'boolean', default: false }
+                }
+              },
+              description: 'Experiência profissional',
+              nullable: true
+            },
+            
+            // Configurações e preferências
+            address: {
+              type: 'object',
+              description: 'Endereço completo',
+              properties: {
+                street: { type: 'string', nullable: true },
+                city: { type: 'string', nullable: true },
+                state: { type: 'string', nullable: true },
+                zipCode: { type: 'string', nullable: true },
+                country: { type: 'string', nullable: true }
+              },
+              nullable: true
+            },
             socialLinks: {
               type: 'object',
               description: 'Links para redes sociais',
               properties: {
-                twitter: { type: 'string', nullable: true },
+                website: { type: 'string', nullable: true },
                 linkedin: { type: 'string', nullable: true },
-                github: { type: 'string', nullable: true }
-              }
+                twitter: { type: 'string', nullable: true },
+                github: { type: 'string', nullable: true },
+                instagram: { type: 'string', nullable: true },
+                facebook: { type: 'string', nullable: true },
+                youtube: { type: 'string', nullable: true }
+              },
+              nullable: true
             },
             preferences: {
               type: 'object',
               description: 'Preferências do usuário',
               properties: {
-                theme: {
-                  type: 'string',
-                  enum: ['light', 'dark', 'auto'],
-                  default: 'auto'
+                language: { type: 'string', default: 'pt-BR' },
+                timezone: { type: 'string', default: 'America/Sao_Paulo' },
+                notifications: {
+                  type: 'object',
+                  properties: {
+                    email: { type: 'boolean', default: true },
+                    push: { type: 'boolean', default: true },
+                    sms: { type: 'boolean', default: false }
+                  }
                 },
-                language: {
-                  type: 'string',
-                  default: 'pt-BR'
-                },
-                timezone: {
-                  type: 'string',
-                  default: 'America/Sao_Paulo'
+                privacy: {
+                  type: 'object',
+                  properties: {
+                    profileVisibility: {
+                      type: 'string',
+                      enum: ['public', 'private', 'friends'],
+                      default: 'public'
+                    },
+                    showEmail: { type: 'boolean', default: false },
+                    showPhone: { type: 'boolean', default: false }
+                  }
                 }
-              }
+              },
+              nullable: true
             },
+            
+            // Configurações de privacidade
             isPublic: {
               type: 'boolean',
               description: 'Se o perfil é público',
               default: true
             },
+            showEmail: {
+              type: 'boolean',
+              description: 'Se mostra email no perfil público',
+              default: false
+            },
+            showPhone: {
+              type: 'boolean',
+              description: 'Se mostra telefone no perfil público',
+              default: false
+            },
+            
             createdAt: {
               type: 'string',
               format: 'date-time'
@@ -201,7 +328,7 @@ export const createOpenAPISpec = () => {
               format: 'date-time'
             }
           },
-          required: ['id', 'userId', 'isPublic', 'createdAt', 'updatedAt']
+          required: ['id', 'userId', 'isPublic', 'showEmail', 'showPhone', 'createdAt', 'updatedAt']
         },
         
         Notification: {
@@ -425,7 +552,10 @@ export const createOpenAPISpec = () => {
             }
           },
           required: ['success', 'message', 'timestamp']
-        }
+        },
+        
+        // Schemas de Roles e Permissões
+        ...roleSchemas
       },
       
       responses: {
@@ -554,6 +684,10 @@ export const createOpenAPISpec = () => {
         description: 'Logs de auditoria e monitoramento'
       },
       {
+        name: 'Roles & Permissões',
+        description: 'Gerenciamento de roles e permissões do sistema'
+      },
+      {
         name: 'Sistema',
         description: 'Endpoints de sistema e health checks'
       }
@@ -564,7 +698,8 @@ export const createOpenAPISpec = () => {
       ...userPaths,
       ...profilePaths,
       ...notificationPaths,
-      ...logPaths
+      ...logPaths,
+      ...rolePaths
     }
   }
 }

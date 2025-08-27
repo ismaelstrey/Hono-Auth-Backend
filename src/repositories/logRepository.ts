@@ -267,9 +267,9 @@ export class LogRepository {
   private buildLogWhereClause(filters: FilterParams): any {
     const where: any = {}
 
-    // Filtros de texto
+    // Filtros de texto avançados
      if (filters.search) {
-       const searchFields = ['action', 'resource', 'path', 'error']
+       const searchFields = ['action', 'resource', 'path', 'error', 'userAgent']
        const searchQuery = createSearchQuery(filters.search, searchFields)
        Object.assign(where, searchQuery)
      }
@@ -281,6 +281,93 @@ export class LogRepository {
     if (filters.level) where.level = filters.level
     if (filters.method) where.method = filters.method
     if (filters.statusCode) where.statusCode = filters.statusCode
+
+    // Filtros por múltiplos valores
+    if (filters.actions && Array.isArray(filters.actions)) {
+      where.action = { in: filters.actions }
+    }
+
+    if (filters.levels && Array.isArray(filters.levels)) {
+      where.level = { in: filters.levels }
+    }
+
+    if (filters.methods && Array.isArray(filters.methods)) {
+      where.method = { in: filters.methods }
+    }
+
+    // Filtros por faixa de status code
+    if (filters.statusCodeFrom || filters.statusCodeTo) {
+      where.statusCode = {}
+      if (filters.statusCodeFrom) {
+        const code = parseInt(filters.statusCodeFrom as string)
+        if (!isNaN(code)) {
+          where.statusCode.gte = code
+        }
+      }
+      if (filters.statusCodeTo) {
+        const code = parseInt(filters.statusCodeTo as string)
+        if (!isNaN(code)) {
+          where.statusCode.lte = code
+        }
+      }
+    }
+
+    // Filtros por faixa de duração
+    if (filters.durationFrom || filters.durationTo) {
+      where.duration = {}
+      if (filters.durationFrom) {
+        const duration = parseInt(filters.durationFrom as string)
+        if (!isNaN(duration)) {
+          where.duration.gte = duration
+        }
+      }
+      if (filters.durationTo) {
+        const duration = parseInt(filters.durationTo as string)
+        if (!isNaN(duration)) {
+          where.duration.lte = duration
+        }
+      }
+    }
+
+    // Filtro por IP específico ou faixa
+    if (filters.ip) {
+      where.ip = filters.ip
+    }
+
+    if (filters.ipPattern) {
+      where.ip = {
+        startsWith: filters.ipPattern
+      }
+    }
+
+    // Filtro por logs com erro
+    if (filters.hasError === 'true' || filters.hasError === true) {
+      where.error = { not: null }
+    }
+
+    // Filtro por logs lentos (duração alta)
+    if (filters.slowRequests) {
+      const threshold = parseInt(filters.slowRequests as string) || 1000
+      where.duration = { gte: threshold }
+    }
+
+    // Filtro por user agent pattern
+    if (filters.userAgentPattern) {
+      where.userAgent = {
+        contains: filters.userAgentPattern,
+        mode: 'insensitive'
+      }
+    }
+
+    // Filtro por códigos de erro HTTP
+    if (filters.errorCodes === 'true' || filters.errorCodes === true) {
+      where.statusCode = { gte: 400 }
+    }
+
+    // Filtro por códigos de sucesso HTTP
+    if (filters.successCodes === 'true' || filters.successCodes === true) {
+      where.statusCode = { gte: 200, lt: 300 }
+    }
 
     // Filtros de data
     const dateFilters = parseDateFilters(filters)

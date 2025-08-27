@@ -6,6 +6,11 @@ import { requireAdmin } from '@/middlewares/auth'
 import { loggingMiddleware } from '@/middlewares/logging'
 import { rateLimitPublic } from '@/middlewares/rateLimiter'
 import {
+  paginatedCache,
+  statsCache,
+  cacheHeaders
+} from '@/middlewares/cache'
+import {
   logFiltersSchema,
   createLogSchema,
   cleanupLogsSchema,
@@ -109,7 +114,7 @@ logRoutes.use('*', requireAdmin) // Apenas administradores podem acessar logs
  *       403:
  *         $ref: '#/components/responses/Forbidden'
  */
-logRoutes.get('/', zValidator('query', logFiltersSchema), LogController.getLogs)
+logRoutes.get('/', zValidator('query', logFiltersSchema), paginatedCache(), cacheHeaders(), LogController.getLogs)
 
 /**
  * @swagger
@@ -149,7 +154,7 @@ logRoutes.get('/', zValidator('query', logFiltersSchema), LogController.getLogs)
  *       403:
  *         $ref: '#/components/responses/Forbidden'
  */
-logRoutes.get('/stats', zValidator('query', logStatsFiltersSchema), LogController.getStats)
+logRoutes.get('/stats', zValidator('query', logStatsFiltersSchema), statsCache(), cacheHeaders(3600), LogController.getStats)
 
 /**
  * @swagger
@@ -215,7 +220,7 @@ logRoutes.get('/stats', zValidator('query', logStatsFiltersSchema), LogControlle
  *       403:
  *         $ref: '#/components/responses/Forbidden'
  */
-logRoutes.get('/errors', zValidator('query', errorLogFiltersSchema), LogController.getErrorLogs)
+logRoutes.get('/errors', zValidator('query', errorLogFiltersSchema), paginatedCache(600), cacheHeaders(600), LogController.getErrorLogs)
 
 /**
  * @swagger
@@ -262,7 +267,7 @@ logRoutes.get('/errors', zValidator('query', errorLogFiltersSchema), LogControll
  *       403:
  *         $ref: '#/components/responses/Forbidden'
  */
-logRoutes.get('/recent', zValidator('query', recentActivityFiltersSchema), LogController.getRecentActivity)
+logRoutes.get('/recent', zValidator('query', recentActivityFiltersSchema), paginatedCache(300), cacheHeaders(300), LogController.getRecentActivity)
 
 /**
  * @swagger
@@ -350,7 +355,7 @@ logRoutes.get('/recent', zValidator('query', recentActivityFiltersSchema), LogCo
  *       403:
  *         $ref: '#/components/responses/Forbidden'
  */
-logRoutes.get('/user/:userId', zValidator('param', userIdParamSchema), zValidator('query', userLogFiltersSchema), LogController.getUserLogs)
+logRoutes.get('/user/:userId', zValidator('param', userIdParamSchema), zValidator('query', userLogFiltersSchema), paginatedCache(600), cacheHeaders(600), LogController.getUserLogs)
 
 /**
  * @swagger

@@ -94,9 +94,31 @@ model UserProfile {
   bio         String?
   phone       String?
   dateOfBirth DateTime?
+  
+  // Informações profissionais
+  company     String?   // Empresa atual
+  jobTitle    String?   // Cargo/posição
+  website     String?   // Website pessoal
+  location    String?   // Localização atual (cidade, país)
+  
+  // Informações adicionais
+  languages   String?   // JSON array de idiomas
+  skills      String?   // JSON array de habilidades
+  interests   String?   // JSON array de interesses
+  education   String?   // JSON string para informações educacionais
+  experience  String?   // JSON string para experiência profissional
+  
+  // Configurações e preferências
   address     String?   // JSON string para endereço completo
   preferences String?   // JSON string para preferências do usuário
   socialLinks String?   // JSON string para links de redes sociais
+  
+  // Configurações de privacidade
+  isPublic    Boolean   @default(true)  // Se o perfil é público
+  showEmail   Boolean   @default(false) // Se mostra email no perfil público
+  showPhone   Boolean   @default(false) // Se mostra telefone no perfil público
+  
+  // Timestamps
   createdAt   DateTime  @default(now())
   updatedAt   DateTime  @updatedAt
 

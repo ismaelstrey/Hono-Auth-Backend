@@ -25,11 +25,76 @@ Este documento descreve como usar as funcionalidades avançadas de paginação, 
 
 ### Filtros Específicos
 
+#### Filtros Gerais
 - `status`: Status do item
-- `role`: Role do usuário (para endpoints de usuários)
+- `search`: Busca textual em múltiplos campos
+
+#### Filtros de Usuários
+- `role`: Role do usuário
+- `roles`: Array de múltiplos roles
 - `emailVerified`: Se o email foi verificado (true/false)
-- `channel`: Canal de notificação (para endpoints de notificações)
-- `priority`: Prioridade (para endpoints de notificações)
+- `emailDomain`: Filtrar por domínio de email
+- `lastLoginFrom`: Data inicial do último login
+- `lastLoginTo`: Data final do último login
+- `neverLoggedIn`: Usuários que nunca fizeram login (true/false)
+- `inactiveDays`: Usuários inativos por X dias
+- `hasProfile`: Se o usuário tem perfil (true/false)
+
+#### Filtros de Notificações
+- `channel`: Canal de notificação
+- `channels`: Array de múltiplos canais
+- `priority`: Prioridade
+- `priorities`: Array de múltiplas prioridades
+- `statuses`: Array de múltiplos status
+- `read`: Se foi lida (true/false)
+- `readFrom`: Data inicial de leitura
+- `readTo`: Data final de leitura
+- `sentFrom`: Data inicial de envio
+- `sentTo`: Data final de envio
+- `retryCount`: Número de tentativas de reenvio
+- `hasFailed`: Notificações com falha (true/false)
+- `unreadDays`: Notificações não lidas há X dias
+
+#### Filtros de Logs
+- `level`: Nível do log
+- `levels`: Array de múltiplos níveis
+- `action`: Ação específica
+- `actions`: Array de múltiplas ações
+- `method`: Método HTTP
+- `methods`: Array de múltiplos métodos
+- `statusCode`: Código de status específico
+- `statusCodeFrom`: Código de status inicial
+- `statusCodeTo`: Código de status final
+- `durationFrom`: Duração mínima em ms
+- `durationTo`: Duração máxima em ms
+- `ip`: IP específico
+- `ipPattern`: Padrão de IP (prefixo)
+- `hasError`: Logs com erro (true/false)
+- `slowRequests`: Requisições lentas (threshold em ms)
+- `userAgentPattern`: Padrão do user agent
+- `errorCodes`: Apenas códigos de erro HTTP (true/false)
+- `successCodes`: Apenas códigos de sucesso HTTP (true/false)
+
+#### Filtros de Perfis
+- `role`: Role do usuário
+- `roles`: Array de múltiplos roles
+- `isPublic`: Perfil público (true/false)
+- `showEmail`: Mostra email (true/false)
+- `showPhone`: Mostra telefone (true/false)
+- `location`: Localização específica
+- `locations`: Array de múltiplas localizações
+- `company`: Empresa específica
+- `companies`: Array de múltiplas empresas
+- `jobTitle`: Cargo específico
+- `ageFrom`: Idade mínima
+- `ageTo`: Idade máxima
+- `hasAvatar`: Tem avatar (true/false)
+- `hasBio`: Tem biografia (true/false)
+- `hasPhone`: Tem telefone (true/false)
+- `hasWebsite`: Tem website (true/false)
+- `isComplete`: Perfil completo (true/false)
+- `updatedFrom`: Data inicial de atualização
+- `updatedTo`: Data final de atualização
 
 ## Exemplos de Uso
 
@@ -67,6 +132,56 @@ GET /api/notifications?userId=123&status=pending&priority=high&page=1&limit=25
 
 ```http
 GET /api/logs?search=login&level=info&dateFrom=2024-01-01T00:00:00Z
+```
+
+### Exemplos de Filtros Avançados
+
+#### Usuários Inativos por Domínio
+
+```http
+GET /api/users?emailDomain=empresa.com&inactiveDays=30&sortBy=lastLogin&sortOrder=asc
+```
+
+#### Notificações Não Lidas com Falha
+
+```http
+GET /api/notifications?read=false&hasFailed=true&unreadDays=7&priority=high
+```
+
+#### Logs de Erro com Duração Alta
+
+```http
+GET /api/logs?errorCodes=true&durationFrom=1000&slowRequests=2000&sortBy=duration&sortOrder=desc
+```
+
+#### Perfis Completos por Localização
+
+```http
+GET /api/profiles?isComplete=true&locations=["São Paulo","Rio de Janeiro"]&hasAvatar=true
+```
+
+#### Usuários por Múltiplos Roles
+
+```http
+GET /api/users?roles=["admin","moderator"]&emailVerified=true&hasProfile=true
+```
+
+#### Logs por Faixa de Status Code
+
+```http
+GET /api/logs?statusCodeFrom=400&statusCodeTo=499&methods=["POST","PUT"]&dateFrom=2024-01-01
+```
+
+#### Notificações por Múltiplos Canais
+
+```http
+GET /api/notifications?channels=["email","push"]&statuses=["sent","delivered"]&priorities=["high","urgent"]
+```
+
+#### Perfis por Faixa Etária
+
+```http
+GET /api/profiles?ageFrom=25&ageTo=35&companies=["Tech Corp","StartupXYZ"]&isPublic=true
 ```
 
 ## Estrutura de Resposta

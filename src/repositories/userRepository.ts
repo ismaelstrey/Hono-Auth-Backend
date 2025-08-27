@@ -179,10 +179,10 @@ export class UserRepository {
     }
 
     if (filters.emailVerified !== undefined) {
-      where.emailVerified = filters.emailVerified
+      where.emailVerified = filters.emailVerified === 'true' || filters.emailVerified === true
     }
 
-    // Filtros de data
+    // Filtros de data de criação
     const dateFilters = parseDateFilters(filters)
     if (dateFilters.dateFrom || dateFilters.dateTo) {
       where.createdAt = {}
@@ -194,11 +194,72 @@ export class UserRepository {
       }
     }
 
-    // Busca textual
+    // Filtros avançados de data de último login
+    if (filters.lastLoginFrom || filters.lastLoginTo) {
+      where.lastLogin = {}
+      if (filters.lastLoginFrom) {
+        const date = new Date(filters.lastLoginFrom)
+        if (!isNaN(date.getTime())) {
+          where.lastLogin.gte = date
+        }
+      }
+      if (filters.lastLoginTo) {
+        const date = new Date(filters.lastLoginTo)
+        if (!isNaN(date.getTime())) {
+          date.setHours(23, 59, 59, 999)
+          where.lastLogin.lte = date
+        }
+      }
+    }
+
+    // Filtro por domínio de email
+    if (filters.emailDomain) {
+      where.email = {
+        endsWith: `@${filters.emailDomain}`
+      }
+    }
+
+    // Filtro para usuários nunca logaram
+    if (filters.neverLoggedIn === 'true' || filters.neverLoggedIn === true) {
+      where.lastLogin = null
+    }
+
+    // Filtro para usuários inativos por período
+    if (filters.inactiveDays) {
+      const days = parseInt(filters.inactiveDays as string)
+      if (!isNaN(days) && days > 0) {
+        const cutoffDate = new Date()
+        cutoffDate.setDate(cutoffDate.getDate() - days)
+        where.OR = [
+          { lastLogin: { lt: cutoffDate } },
+          { lastLogin: null, createdAt: { lt: cutoffDate } }
+        ]
+      }
+    }
+
+    // Filtro por múltiplos roles
+    if (filters.roles && Array.isArray(filters.roles)) {
+      const roleIds = filters.roles.map(role => ROLE_ID_MAPPING[role as UserRole]).filter(Boolean)
+      if (roleIds.length > 0) {
+        where.roleId = { in: roleIds }
+      }
+    }
+
+    // Busca textual avançada
     if (filters.search) {
       const searchFields = ['name', 'email']
       const searchQuery = createSearchQuery(filters.search, searchFields)
       Object.assign(where, searchQuery)
+    }
+
+    // Filtro por presença de perfil
+    if (filters.hasProfile !== undefined) {
+      const hasProfile = filters.hasProfile === 'true' || filters.hasProfile === true
+      if (hasProfile) {
+        where.profile = { isNot: null }
+      } else {
+        where.profile = null
+      }
     }
 
     return where

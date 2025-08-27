@@ -1,5 +1,9 @@
 import { PrismaClient, UserProfile } from '@prisma/client'
 import { prisma } from '@/config/database'
+import { DatabaseError } from '@/utils/errors'
+import { logger } from '@/utils/logger'
+import type { PaginationParams, PaginatedResult, SortParams, FilterParams } from '@/utils/pagination'
+import { createPaginatedResult, createSearchQuery, parseDateFilters } from '@/utils/pagination'
 
 export interface CreateProfileData {
   userId: string
@@ -8,9 +12,29 @@ export interface CreateProfileData {
   bio?: string
   phone?: string
   dateOfBirth?: Date
+  
+  // Informações profissionais
+  company?: string
+  jobTitle?: string
+  website?: string
+  location?: string
+  
+  // Informações adicionais
+  languages?: string // JSON array
+  skills?: string // JSON array
+  interests?: string // JSON array
+  education?: string // JSON string
+  experience?: string // JSON string
+  
+  // Configurações e preferências
   address?: string // JSON string
   preferences?: string // JSON string
   socialLinks?: string // JSON string
+  
+  // Configurações de privacidade
+  isPublic?: boolean
+  showEmail?: boolean
+  showPhone?: boolean
 }
 
 export interface UpdateProfileData {
@@ -19,9 +43,29 @@ export interface UpdateProfileData {
   bio?: string
   phone?: string
   dateOfBirth?: Date
+  
+  // Informações profissionais
+  company?: string
+  jobTitle?: string
+  website?: string
+  location?: string
+  
+  // Informações adicionais
+  languages?: string // JSON array
+  skills?: string // JSON array
+  interests?: string // JSON array
+  education?: string // JSON string
+  experience?: string // JSON string
+  
+  // Configurações e preferências
   address?: string // JSON string
   preferences?: string // JSON string
   socialLinks?: string // JSON string
+  
+  // Configurações de privacidade
+  isPublic?: boolean
+  showEmail?: boolean
+  showPhone?: boolean
 }
 
 export interface ProfileWithUser {
@@ -33,9 +77,30 @@ export interface ProfileWithUser {
   bio: string | null
   phone: string | null
   dateOfBirth: Date | null
+  
+  // Informações profissionais
+  company: string | null
+  jobTitle: string | null
+  website: string | null
+  location: string | null
+  
+  // Informações adicionais
+  languages: string | null
+  skills: string | null
+  interests: string | null
+  education: string | null
+  experience: string | null
+  
+  // Configurações e preferências
   address: string | null
   preferences: string | null
   socialLinks: string | null
+  
+  // Configurações de privacidade
+  isPublic: boolean
+  showEmail: boolean
+  showPhone: boolean
+  
   createdAt: Date
   updatedAt: Date
   user: {
@@ -208,6 +273,254 @@ class ProfileRepository {
       page,
       totalPages: Math.ceil(total / limit)
     }
+  }
+
+  /**
+   * Buscar perfis com paginação, filtros e busca avançados
+   */
+  async findManyAdvanced(
+    pagination: PaginationParams,
+    sort: SortParams = {},
+    filters: FilterParams = {}
+  ): Promise<PaginatedResult<ProfileWithUser>> {
+    try {
+      const whereClause = this.buildProfileWhereClause(filters)
+      const orderBy = this.buildProfileOrderBy(sort)
+
+      const [profiles, total] = await Promise.all([
+        this.db.userProfile.findMany({
+          where: whereClause,
+          skip: pagination.offset,
+          take: pagination.limit,
+          orderBy,
+          include: {
+            user: {
+              select: {
+                id: true,
+                name: true,
+                email: true,
+                role: {
+                  select: {
+                    name: true
+                  }
+                }
+              }
+            }
+          }
+        }),
+        this.db.userProfile.count({ where: whereClause })
+      ])
+
+      return createPaginatedResult(profiles as ProfileWithUser[], total, pagination)
+    } catch (error) {
+      throw new DatabaseError('Erro ao buscar perfis', error)
+    }
+  }
+
+  /**
+   * Construir cláusula WHERE para filtros de perfil
+   */
+  private buildProfileWhereClause(filters: FilterParams): any {
+    const where: any = {}
+
+    // Busca textual avançada
+    if (filters.search) {
+      where.OR = [
+        { firstName: { contains: filters.search, mode: 'insensitive' } },
+        { lastName: { contains: filters.search, mode: 'insensitive' } },
+        { bio: { contains: filters.search, mode: 'insensitive' } },
+        { company: { contains: filters.search, mode: 'insensitive' } },
+        { jobTitle: { contains: filters.search, mode: 'insensitive' } },
+        { location: { contains: filters.search, mode: 'insensitive' } },
+        { website: { contains: filters.search, mode: 'insensitive' } },
+        { user: { 
+          OR: [
+            { name: { contains: filters.search, mode: 'insensitive' } },
+            { email: { contains: filters.search, mode: 'insensitive' } }
+          ]
+        }}
+      ]
+    }
+
+    // Filtros por role
+    if (filters.role) {
+      where.user = {
+        ...where.user,
+        role: {
+          name: filters.role
+        }
+      }
+    }
+
+    // Filtros por múltiplos roles
+    if (filters.roles && Array.isArray(filters.roles)) {
+      where.user = {
+        ...where.user,
+        role: {
+          name: { in: filters.roles }
+        }
+      }
+    }
+
+    // Filtros de visibilidade
+    if (filters.isPublic !== undefined) {
+      where.isPublic = filters.isPublic === 'true' || filters.isPublic === true
+    }
+
+    if (filters.showEmail !== undefined) {
+      where.showEmail = filters.showEmail === 'true' || filters.showEmail === true
+    }
+
+    if (filters.showPhone !== undefined) {
+      where.showPhone = filters.showPhone === 'true' || filters.showPhone === true
+    }
+
+    // Filtros por localização
+    if (filters.location) {
+      where.location = { contains: filters.location, mode: 'insensitive' }
+    }
+
+    if (filters.locations && Array.isArray(filters.locations)) {
+      where.location = {
+        in: filters.locations
+      }
+    }
+
+    // Filtros por empresa
+    if (filters.company) {
+      where.company = { contains: filters.company, mode: 'insensitive' }
+    }
+
+    if (filters.companies && Array.isArray(filters.companies)) {
+      where.company = {
+        in: filters.companies
+      }
+    }
+
+    // Filtro por cargo
+    if (filters.jobTitle) {
+      where.jobTitle = { contains: filters.jobTitle, mode: 'insensitive' }
+    }
+
+    // Filtro por faixa etária
+    if (filters.ageFrom || filters.ageTo) {
+      const currentYear = new Date().getFullYear()
+      
+      if (filters.ageFrom) {
+        const ageFrom = parseInt(filters.ageFrom as string)
+        if (!isNaN(ageFrom)) {
+          const maxBirthYear = currentYear - ageFrom
+          where.birthDate = {
+            ...where.birthDate,
+            lte: new Date(`${maxBirthYear}-12-31`)
+          }
+        }
+      }
+      
+      if (filters.ageTo) {
+        const ageTo = parseInt(filters.ageTo as string)
+        if (!isNaN(ageTo)) {
+          const minBirthYear = currentYear - ageTo
+          where.birthDate = {
+            ...where.birthDate,
+            gte: new Date(`${minBirthYear}-01-01`)
+          }
+        }
+      }
+    }
+
+    // Filtro por presença de avatar
+    if (filters.hasAvatar !== undefined) {
+      const hasAvatar = filters.hasAvatar === 'true' || filters.hasAvatar === true
+      if (hasAvatar) {
+        where.avatar = { not: null }
+      } else {
+        where.avatar = null
+      }
+    }
+
+    // Filtro por presença de biografia
+    if (filters.hasBio !== undefined) {
+      const hasBio = filters.hasBio === 'true' || filters.hasBio === true
+      if (hasBio) {
+        where.bio = { not: null }
+      } else {
+        where.bio = null
+      }
+    }
+
+    // Filtro por presença de telefone
+    if (filters.hasPhone !== undefined) {
+      const hasPhone = filters.hasPhone === 'true' || filters.hasPhone === true
+      if (hasPhone) {
+        where.phone = { not: null }
+      } else {
+        where.phone = null
+      }
+    }
+
+    // Filtro por presença de website
+    if (filters.hasWebsite !== undefined) {
+      const hasWebsite = filters.hasWebsite === 'true' || filters.hasWebsite === true
+      if (hasWebsite) {
+        where.website = { not: null }
+      } else {
+        where.website = null
+      }
+    }
+
+    // Filtro por perfis completos (com informações básicas preenchidas)
+    if (filters.isComplete === 'true' || filters.isComplete === true) {
+      where.AND = [
+        { firstName: { not: null } },
+        { lastName: { not: null } },
+        { bio: { not: null } }
+      ]
+    }
+
+    // Filtros de data
+    const dateFilters = parseDateFilters(filters)
+    if (dateFilters.dateFrom || dateFilters.dateTo) {
+      where.createdAt = {}
+      if (dateFilters.dateFrom) where.createdAt.gte = dateFilters.dateFrom
+      if (dateFilters.dateTo) where.createdAt.lte = dateFilters.dateTo
+    }
+
+    // Filtros de data de atualização
+    if (filters.updatedFrom || filters.updatedTo) {
+      where.updatedAt = {}
+      if (filters.updatedFrom) {
+        const date = new Date(filters.updatedFrom)
+        if (!isNaN(date.getTime())) {
+          where.updatedAt.gte = date
+        }
+      }
+      if (filters.updatedTo) {
+        const date = new Date(filters.updatedTo)
+        if (!isNaN(date.getTime())) {
+          date.setHours(23, 59, 59, 999)
+          where.updatedAt.lte = date
+        }
+      }
+    }
+
+    return where
+  }
+
+  /**
+   * Construir cláusula ORDER BY para ordenação de perfis
+   */
+  private buildProfileOrderBy(sort: SortParams): any {
+    const validSortFields = [
+      'firstName', 'lastName', 'company', 'jobTitle', 
+      'location', 'createdAt', 'updatedAt'
+    ]
+
+    if (sort.field && validSortFields.includes(sort.field)) {
+      return { [sort.field]: sort.direction || 'desc' }
+    }
+
+    return { updatedAt: 'desc' }
   }
 
   /**

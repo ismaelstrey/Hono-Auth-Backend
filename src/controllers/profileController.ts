@@ -3,6 +3,8 @@ import { profileService, ProfileData } from '@/services/profileService'
 import { AppError, AuthenticationError, AuthorizationError } from '@/utils/errors'
 import { logger } from '@/utils/logger'
 import { z } from 'zod'
+import { extractPaginationParams, extractSortParams, extractFilterParams } from '@/utils/pagination'
+import { successResponse, errorResponse } from '@/utils/helpers'
 
 // Schemas de validação
 const addressSchema = z.object({
@@ -309,41 +311,26 @@ class ProfileController {
         throw new AuthorizationError('Acesso negado')
       }
 
-      const query = querySchema.parse({
-        page: c.req.query('page'),
-        limit: c.req.query('limit'),
-        search: c.req.query('search')
-      })
+      // Usar sistema de paginação padronizado
+      const pagination = extractPaginationParams(c)
+      const sort = extractSortParams(c, ['createdAt', 'updatedAt', 'firstName', 'lastName'])
+      const filters = extractFilterParams(c, ['isPublic', 'hasAvatar'])
 
-      const result = await profileService.listProfiles(query)
+      const result = await profileService.listProfilesAdvanced(pagination, sort, filters)
 
-      return c.json({
-        success: true,
-        data: result.profiles,
-        pagination: result.pagination
-      })
+      return c.json(successResponse(result))
     } catch (error) {
       logger.error('Erro no controller listProfiles', { error })
       
       if (error instanceof z.ZodError) {
-        return c.json({
-          success: false,
-          message: 'Parâmetros inválidos',
-          errors: error.errors
-        }, 400)
+        return c.json(errorResponse('Parâmetros inválidos', error.errors), 400)
       }
 
       if (error instanceof AppError) {
-        return c.json({
-          success: false,
-          message: error.message
-        }, error.statusCode as any)
+        return c.json(errorResponse(error.message), error.statusCode as any)
       }
 
-      return c.json({
-        success: false,
-        message: 'Erro interno do servidor'
-      }, 500)
+      return c.json(errorResponse('Erro interno do servidor'), 500)
     }
   }
 

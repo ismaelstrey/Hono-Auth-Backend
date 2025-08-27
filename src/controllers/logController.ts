@@ -1,6 +1,7 @@
 import type { Context } from 'hono'
 import { logService } from '@/services/logService'
 import { successResponse, errorResponse } from '@/utils/helpers'
+import { extractPaginationParams, extractSortParams, extractFilterParams } from '@/utils/pagination'
 import type { LogFilters, LogLevel } from '@/types'
 
 /**
@@ -14,18 +15,11 @@ export class LogController {
     try {
       const query = c.req.query()
       
-      const filters: LogFilters = {
-        userId: query.userId,
-        action: query.action,
-        resource: query.resource,
-        level: query.level as LogLevel,
-        startDate: query.startDate ? new Date(query.startDate) : undefined,
-        endDate: query.endDate ? new Date(query.endDate) : undefined,
-        limit: query.limit ? parseInt(query.limit) : 50,
-        offset: query.offset ? parseInt(query.offset) : 0
-      }
+      const pagination = extractPaginationParams(query)
+      const sort = extractSortParams(query)
+      const filters = extractFilterParams(query, ['userId', 'action', 'resource', 'level'])
 
-      const result = await logService.getLogs(filters)
+      const result = await logService.getLogsAdvanced(pagination, sort, filters)
       
       return c.json(successResponse(result, 'Logs obtidos com sucesso'))
     } catch (error: any) {
@@ -116,18 +110,12 @@ export class LogController {
       const userId = c.req.param('userId')
       const query = c.req.query()
       
-      const filters: LogFilters = {
-        userId,
-        action: query.action,
-        resource: query.resource,
-        level: query.level as LogLevel,
-        startDate: query.startDate ? new Date(query.startDate) : undefined,
-        endDate: query.endDate ? new Date(query.endDate) : undefined,
-        limit: query.limit ? parseInt(query.limit) : 50,
-        offset: query.offset ? parseInt(query.offset) : 0
-      }
+      const pagination = extractPaginationParams(query)
+      const sort = extractSortParams(query)
+      const filters = extractFilterParams(query, ['action', 'resource', 'level'])
+      filters.userId = userId // Adiciona o userId específico
 
-      const result = await logService.getLogs(filters)
+      const result = await logService.getLogsAdvanced(pagination, sort, filters)
       
       return c.json(successResponse(result, 'Logs do usuário obtidos com sucesso'))
     } catch (error: any) {
@@ -142,15 +130,12 @@ export class LogController {
     try {
       const query = c.req.query()
       
-      const filters: LogFilters = {
-        level: 'error' as LogLevel,
-        startDate: query.startDate ? new Date(query.startDate) : undefined,
-        endDate: query.endDate ? new Date(query.endDate) : undefined,
-        limit: query.limit ? parseInt(query.limit) : 100,
-        offset: query.offset ? parseInt(query.offset) : 0
-      }
+      const pagination = extractPaginationParams(query)
+      const sort = extractSortParams(query)
+      const filters = extractFilterParams(query, ['userId', 'action', 'resource'])
+      filters.level = 'error' // Força o filtro para logs de erro
 
-      const result = await logService.getLogs(filters)
+      const result = await logService.getLogsAdvanced(pagination, sort, filters)
       
       return c.json(successResponse(result, 'Logs de erro obtidos com sucesso'))
     } catch (error: any) {
@@ -169,12 +154,12 @@ export class LogController {
       const startDate = new Date()
       startDate.setHours(startDate.getHours() - hours)
       
-      const filters: LogFilters = {
-        startDate,
-        limit: 100
-      }
+      const pagination = extractPaginationParams(query)
+      const sort = extractSortParams(query)
+      const filters = extractFilterParams(query, ['userId', 'action', 'resource', 'level'])
+      filters.startDate = startDate
 
-      const result = await logService.getLogs(filters)
+      const result = await logService.getLogsAdvanced(pagination, sort, filters)
       
       return c.json(successResponse(
         result, 

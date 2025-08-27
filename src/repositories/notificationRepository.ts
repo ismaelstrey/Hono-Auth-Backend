@@ -139,7 +139,7 @@ export class NotificationRepository {
     if (filters.priority) where.priority = filters.priority
     if (filters.read !== undefined) where.readAt = filters.read ? { not: null } : null
 
-    // Filtros de data
+    // Filtros de data de criação
      const dateFilters = parseDateFilters(filters)
      if (dateFilters.dateFrom || dateFilters.dateTo) {
        where.createdAt = {}
@@ -147,11 +147,89 @@ export class NotificationRepository {
        if (dateFilters.dateTo) where.createdAt.lte = dateFilters.dateTo
      }
 
-    // Busca por texto
+    // Filtros avançados de data de leitura
+    if (filters.readFrom || filters.readTo) {
+      where.readAt = {}
+      if (filters.readFrom) {
+        const date = new Date(filters.readFrom)
+        if (!isNaN(date.getTime())) {
+          where.readAt.gte = date
+        }
+      }
+      if (filters.readTo) {
+        const date = new Date(filters.readTo)
+        if (!isNaN(date.getTime())) {
+          date.setHours(23, 59, 59, 999)
+          where.readAt.lte = date
+        }
+      }
+    }
+
+    // Filtros avançados de data de envio
+    if (filters.sentFrom || filters.sentTo) {
+      where.sentAt = {}
+      if (filters.sentFrom) {
+        const date = new Date(filters.sentFrom)
+        if (!isNaN(date.getTime())) {
+          where.sentAt.gte = date
+        }
+      }
+      if (filters.sentTo) {
+        const date = new Date(filters.sentTo)
+        if (!isNaN(date.getTime())) {
+          date.setHours(23, 59, 59, 999)
+          where.sentAt.lte = date
+        }
+      }
+    }
+
+    // Filtro por múltiplos canais
+    if (filters.channels && Array.isArray(filters.channels)) {
+      where.channel = { in: filters.channels }
+    }
+
+    // Filtro por múltiplas prioridades
+    if (filters.priorities && Array.isArray(filters.priorities)) {
+      where.priority = { in: filters.priorities }
+    }
+
+    // Filtro por múltiplos status
+    if (filters.statuses && Array.isArray(filters.statuses)) {
+      where.status = { in: filters.statuses }
+    }
+
+    // Filtro por tentativas de reenvio
+    if (filters.retryCount !== undefined) {
+      const count = parseInt(filters.retryCount as string)
+      if (!isNaN(count)) {
+        where.retryCount = count
+      }
+    }
+
+    // Filtro por notificações com falhas
+    if (filters.hasFailed === 'true' || filters.hasFailed === true) {
+      where.failureReason = { not: null }
+    }
+
+    // Filtro por notificações não lidas há X dias
+    if (filters.unreadDays) {
+      const days = parseInt(filters.unreadDays as string)
+      if (!isNaN(days) && days > 0) {
+        const cutoffDate = new Date()
+        cutoffDate.setDate(cutoffDate.getDate() - days)
+        where.AND = [
+          { readAt: null },
+          { createdAt: { lt: cutoffDate } }
+        ]
+      }
+    }
+
+    // Busca por texto avançada
     if (filters.search) {
       where.OR = [
         { title: { contains: filters.search, mode: 'insensitive' } },
-        { message: { contains: filters.search, mode: 'insensitive' } }
+        { message: { contains: filters.search, mode: 'insensitive' } },
+        { failureReason: { contains: filters.search, mode: 'insensitive' } }
       ]
     }
 
