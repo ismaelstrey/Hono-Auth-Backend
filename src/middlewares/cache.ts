@@ -247,6 +247,8 @@ export function statsCache(ttl: number = CacheTTL.LONG) {
       // Remove parâmetros sensíveis ao tempo
       const { page: _page, limit: _limit, ...filters } = query
 
+      console.log(_page, _limit)
+
       const filtersHash = createHash('md5')
         .update(JSON.stringify(filters))
         .digest('hex')

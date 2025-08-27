@@ -594,9 +594,10 @@ class ProfileRepository {
     withPhone: number
     byRole: { role: string; count: number }[]
   }> {
-    const [total, withAvatar, withBio, withPhone, byRole] = await Promise.all([
+    const [total, withAvatar, withBio, withPhone] = await Promise.all([
       this.db.userProfile.count(),
       this.db.userProfile.count({ where: { avatar: { not: null } } }),
+
       this.db.userProfile.count({ where: { bio: { not: null } } }),
       this.db.userProfile.count({ where: { phone: { not: null } } }),
       this.db.userProfile.groupBy({

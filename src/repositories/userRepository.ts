@@ -160,16 +160,16 @@ export class UserRepository {
     // Filtros básicos
     if (filters.status) {
       switch (filters.status) {
-        case 'active':
-          where.isActive = true
-          where.lockedUntil = null
-          break
-        case 'inactive':
-          where.isActive = false
-          break
-        case 'locked':
-          where.lockedUntil = { gt: new Date() }
-          break
+      case 'active':
+        where.isActive = true
+        where.lockedUntil = null
+        break
+      case 'inactive':
+        where.isActive = false
+        break
+      case 'locked':
+        where.lockedUntil = { gt: new Date() }
+        break
       }
     }
 

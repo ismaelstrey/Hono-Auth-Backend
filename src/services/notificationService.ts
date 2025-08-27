@@ -39,7 +39,7 @@ export class NotificationService {
 
       // Verifica as preferências do usuário
       const preferences = await this.getUserPreferences(data.userId, data.typeId)
-      
+
       // Se o usuário desabilitou este canal, não cria a notificação
       if (!this.isChannelEnabled(preferences, data.channel)) {
         throw new Error(`Canal '${data.channel}' desabilitado para este usuário`)
@@ -130,7 +130,7 @@ export class NotificationService {
       // Atualiza o status da notificação
       const newStatus = result.success ? 'sent' : 'failed'
       const additionalData = result.success ? {} : { failureReason: result.error || result.message }
-      
+
       await notificationRepository.updateStatus(notificationId, newStatus, additionalData)
 
       await this.logService.info(`Notificação ${result.success ? 'enviada' : 'falhou'}`, {
@@ -176,7 +176,7 @@ export class NotificationService {
   async processPendingNotifications(limit: number = 100): Promise<void> {
     try {
       const pendingNotifications = await notificationRepository.findPendingNotifications(limit)
-      
+
       await this.logService.info(`Processando ${pendingNotifications.length} notificações pendentes`, {
         count: pendingNotifications.length
       }, {
@@ -188,7 +188,7 @@ export class NotificationService {
       })
 
       const results = await Promise.allSettled(
-        pendingNotifications.map(notification => 
+        pendingNotifications.map(notification =>
           this.sendNotification(notification.id)
         )
       )
@@ -244,7 +244,7 @@ export class NotificationService {
    */
   async markAsRead(notificationId: string, userId: string): Promise<Notification | null> {
     const notification = await notificationRepository.findById(notificationId)
-    
+
     if (!notification || notification.userId !== userId) {
       throw new Error('Notificação não encontrada ou acesso negado')
     }
@@ -290,30 +290,30 @@ export class NotificationService {
    * Busca preferências do usuário
    */
   async getUserPreferences(userId: string, typeId?: string): Promise<NotificationPreference | NotificationPreference[]> {
-    const cacheKey = typeId 
+    const cacheKey = typeId
       ? `user_preferences:${userId}:${typeId}`
       : `user_preferences:${userId}`
-    
+
     // Tentar buscar do cache
     const cached = await cacheService.get<NotificationPreference | NotificationPreference[]>(cacheKey)
     if (cached) {
       logger.debug('Cache hit para preferências de notificação', { userId, typeId })
       return cached
     }
-    
+
     let result: NotificationPreference | NotificationPreference[]
-    
+
     if (typeId) {
       const preference = await notificationRepository.findUserPreference(userId, typeId)
       result = preference || this.getDefaultPreference(userId, typeId)
     } else {
       result = await notificationRepository.findUserPreferences(userId)
     }
-    
+
     // Armazenar no cache
     await cacheService.set(cacheKey, result, CacheTTL.MEDIUM)
     logger.debug('Cache miss para preferências de notificação', { userId, typeId })
-    
+
     return result
   }
 
@@ -326,10 +326,10 @@ export class NotificationService {
     data: UpdateNotificationPreferenceData
   ): Promise<NotificationPreference> {
     const result = await notificationRepository.upsertUserPreference(userId, typeId, data)
-    
+
     // Invalidar cache das preferências
     await this.invalidateUserPreferencesCache(userId, typeId)
-    
+
     return result
   }
 
@@ -383,7 +383,7 @@ export class NotificationService {
     variables: NotificationTemplateVariables
   ): Promise<ProcessedTemplate> {
     const template = await notificationRepository.findTemplate(typeId, channel)
-    
+
     if (!template) {
       return {
         title: 'Notificação',
@@ -404,7 +404,7 @@ export class NotificationService {
    */
   private replaceVariables(template: string, variables: NotificationTemplateVariables): string {
     let result = template
-    
+
     Object.entries(variables).forEach(([key, value]) => {
       const regex = new RegExp(`{{\\s*${key}\\s*}}`, 'g')
       result = result.replace(regex, String(value))
@@ -454,7 +454,7 @@ export class NotificationService {
     console.log('Para:', (notification as unknown as { user?: { name?: string } }).user?.name)
     console.log('Título:', template.title || notification.title)
     console.log('Mensagem:', template.body || notification.message)
-    
+
     return {
       success: true,
       message: 'Notificação push enviada (simulado)'
@@ -472,7 +472,7 @@ export class NotificationService {
     console.log('📱 SMS NOTIFICATION (SIMULADO):')
     console.log('Para:', (notification as unknown as { user?: { name?: string } }).user?.name)
     console.log('Mensagem:', template.body || notification.message)
-    
+
     return {
       success: true,
       message: 'SMS enviado (simulado)'
@@ -487,8 +487,11 @@ export class NotificationService {
     _template: ProcessedTemplate
   ): Promise<SendNotificationResult> {
     // Para notificações in-app, apenas marcamos como enviada
+    console.log(_notification, _template)
+
     // O frontend buscará as notificações via API
     return {
+
       success: true,
       message: 'Notificação in-app criada'
     }
@@ -499,7 +502,7 @@ export class NotificationService {
    */
   async cleanup(daysToKeep: number): Promise<number> {
     const deletedCount = await notificationRepository.cleanup(daysToKeep)
-    
+
     await this.logService.info('Limpeza de notificações concluída', {
       deletedCount,
       daysToKeep
@@ -522,11 +525,11 @@ export class NotificationService {
       `user_preferences:${userId}`,
       `user_preferences:${userId}:${typeId}`
     ]
-    
+
     for (const key of keys) {
       await cacheService.del(key)
     }
-    
+
     logger.debug('Cache de preferências invalidado', { userId, typeId })
   }
 }
