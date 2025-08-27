@@ -1,9 +1,8 @@
 import { PrismaClient, UserProfile } from '@prisma/client'
 import { prisma } from '@/config/database'
 import { DatabaseError } from '@/utils/errors'
-import { logger } from '@/utils/logger'
 import type { PaginationParams, PaginatedResult, SortParams, FilterParams } from '@/utils/pagination'
-import { createPaginatedResult, createSearchQuery, parseDateFilters } from '@/utils/pagination'
+import { createPaginatedResult, parseDateFilters } from '@/utils/pagination'
 
 export interface CreateProfileData {
   userId: string
@@ -12,25 +11,25 @@ export interface CreateProfileData {
   bio?: string
   phone?: string
   dateOfBirth?: Date
-  
+
   // Informações profissionais
   company?: string
   jobTitle?: string
   website?: string
   location?: string
-  
+
   // Informações adicionais
   languages?: string // JSON array
   skills?: string // JSON array
   interests?: string // JSON array
   education?: string // JSON string
   experience?: string // JSON string
-  
+
   // Configurações e preferências
   address?: string // JSON string
   preferences?: string // JSON string
   socialLinks?: string // JSON string
-  
+
   // Configurações de privacidade
   isPublic?: boolean
   showEmail?: boolean
@@ -43,25 +42,25 @@ export interface UpdateProfileData {
   bio?: string
   phone?: string
   dateOfBirth?: Date
-  
+
   // Informações profissionais
   company?: string
   jobTitle?: string
   website?: string
   location?: string
-  
+
   // Informações adicionais
   languages?: string // JSON array
   skills?: string // JSON array
   interests?: string // JSON array
   education?: string // JSON string
   experience?: string // JSON string
-  
+
   // Configurações e preferências
   address?: string // JSON string
   preferences?: string // JSON string
   socialLinks?: string // JSON string
-  
+
   // Configurações de privacidade
   isPublic?: boolean
   showEmail?: boolean
@@ -77,30 +76,30 @@ export interface ProfileWithUser {
   bio: string | null
   phone: string | null
   dateOfBirth: Date | null
-  
+
   // Informações profissionais
   company: string | null
   jobTitle: string | null
   website: string | null
   location: string | null
-  
+
   // Informações adicionais
   languages: string | null
   skills: string | null
   interests: string | null
   education: string | null
   experience: string | null
-  
+
   // Configurações e preferências
   address: string | null
   preferences: string | null
   socialLinks: string | null
-  
+
   // Configurações de privacidade
   isPublic: boolean
   showEmail: boolean
   showPhone: boolean
-  
+
   createdAt: Date
   updatedAt: Date
   user: {
@@ -228,18 +227,20 @@ class ProfileRepository {
     totalPages: number
   }> {
     const skip = (page - 1) * limit
-    
+
     const where = search ? {
       OR: [
         { firstName: { contains: search, mode: 'insensitive' as const } },
         { lastName: { contains: search, mode: 'insensitive' as const } },
         { bio: { contains: search, mode: 'insensitive' as const } },
-        { user: { 
-          OR: [
-            { name: { contains: search, mode: 'insensitive' as const } },
-            { email: { contains: search, mode: 'insensitive' as const } }
-          ]
-        }}
+        {
+          user: {
+            OR: [
+              { name: { contains: search, mode: 'insensitive' as const } },
+              { email: { contains: search, mode: 'insensitive' as const } }
+            ]
+          }
+        }
       ]
     } : {}
 
@@ -333,12 +334,14 @@ class ProfileRepository {
         { jobTitle: { contains: filters.search, mode: 'insensitive' } },
         { location: { contains: filters.search, mode: 'insensitive' } },
         { website: { contains: filters.search, mode: 'insensitive' } },
-        { user: { 
-          OR: [
-            { name: { contains: filters.search, mode: 'insensitive' } },
-            { email: { contains: filters.search, mode: 'insensitive' } }
-          ]
-        }}
+        {
+          user: {
+            OR: [
+              { name: { contains: filters.search, mode: 'insensitive' } },
+              { email: { contains: filters.search, mode: 'insensitive' } }
+            ]
+          }
+        }
       ]
     }
 
@@ -364,15 +367,15 @@ class ProfileRepository {
 
     // Filtros de visibilidade
     if (filters.isPublic !== undefined) {
-      where.isPublic = filters.isPublic === 'true' || filters.isPublic === true
+      where.isPublic = typeof filters.isPublic === 'string' ? filters.isPublic === 'true' : Boolean(filters.isPublic)
     }
 
     if (filters.showEmail !== undefined) {
-      where.showEmail = filters.showEmail === 'true' || filters.showEmail === true
+      where.showEmail = typeof filters.showEmail === 'string' ? filters.showEmail === 'true' : Boolean(filters.showEmail)
     }
 
     if (filters.showPhone !== undefined) {
-      where.showPhone = filters.showPhone === 'true' || filters.showPhone === true
+      where.showPhone = typeof filters.showPhone === 'string' ? filters.showPhone === 'true' : Boolean(filters.showPhone)
     }
 
     // Filtros por localização
@@ -405,7 +408,7 @@ class ProfileRepository {
     // Filtro por faixa etária
     if (filters.ageFrom || filters.ageTo) {
       const currentYear = new Date().getFullYear()
-      
+
       if (filters.ageFrom) {
         const ageFrom = parseInt(filters.ageFrom as string)
         if (!isNaN(ageFrom)) {
@@ -416,7 +419,7 @@ class ProfileRepository {
           }
         }
       }
-      
+
       if (filters.ageTo) {
         const ageTo = parseInt(filters.ageTo as string)
         if (!isNaN(ageTo)) {
@@ -431,7 +434,7 @@ class ProfileRepository {
 
     // Filtro por presença de avatar
     if (filters.hasAvatar !== undefined) {
-      const hasAvatar = filters.hasAvatar === 'true' || filters.hasAvatar === true
+      const hasAvatar = typeof filters.hasAvatar === 'string' ? filters.hasAvatar === 'true' : Boolean(filters.hasAvatar)
       if (hasAvatar) {
         where.avatar = { not: null }
       } else {
@@ -441,7 +444,7 @@ class ProfileRepository {
 
     // Filtro por presença de biografia
     if (filters.hasBio !== undefined) {
-      const hasBio = filters.hasBio === 'true' || filters.hasBio === true
+      const hasBio = typeof filters.hasBio === 'string' ? filters.hasBio === 'true' : Boolean(filters.hasBio)
       if (hasBio) {
         where.bio = { not: null }
       } else {
@@ -451,7 +454,7 @@ class ProfileRepository {
 
     // Filtro por presença de telefone
     if (filters.hasPhone !== undefined) {
-      const hasPhone = filters.hasPhone === 'true' || filters.hasPhone === true
+      const hasPhone = typeof filters.hasPhone === 'string' ? filters.hasPhone === 'true' : Boolean(filters.hasPhone)
       if (hasPhone) {
         where.phone = { not: null }
       } else {
@@ -461,7 +464,7 @@ class ProfileRepository {
 
     // Filtro por presença de website
     if (filters.hasWebsite !== undefined) {
-      const hasWebsite = filters.hasWebsite === 'true' || filters.hasWebsite === true
+      const hasWebsite = typeof filters.hasWebsite === 'string' ? filters.hasWebsite === 'true' : Boolean(filters.hasWebsite)
       if (hasWebsite) {
         where.website = { not: null }
       } else {
@@ -470,7 +473,7 @@ class ProfileRepository {
     }
 
     // Filtro por perfis completos (com informações básicas preenchidas)
-    if (filters.isComplete === 'true' || filters.isComplete === true) {
+    if (filters.isComplete && (typeof filters.isComplete === 'string' ? filters.isComplete === 'true' : filters.isComplete)) {
       where.AND = [
         { firstName: { not: null } },
         { lastName: { not: null } },
@@ -512,12 +515,12 @@ class ProfileRepository {
    */
   private buildProfileOrderBy(sort: SortParams): any {
     const validSortFields = [
-      'firstName', 'lastName', 'company', 'jobTitle', 
+      'firstName', 'lastName', 'company', 'jobTitle',
       'location', 'createdAt', 'updatedAt'
     ]
 
-    if (sort.field && validSortFields.includes(sort.field)) {
-      return { [sort.field]: sort.direction || 'desc' }
+    if ('field' in sort && typeof sort.field === 'string' && validSortFields.includes(sort.field)) {
+      return { [sort.field]: (sort as any).direction || 'desc' }
     }
 
     return { updatedAt: 'desc' }
@@ -604,7 +607,7 @@ class ProfileRepository {
 
     // Processar estatísticas por role
     const roleStats: { [key: string]: number } = {}
-    
+
     // Como groupBy não suporta include, vamos fazer uma query separada
     const profilesWithRoles = await this.db.userProfile.findMany({
       select: {

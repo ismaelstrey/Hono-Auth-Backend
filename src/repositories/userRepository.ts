@@ -2,7 +2,7 @@ import { prisma } from '@/config/database'
 import type { User, CreateUserData, UpdateUserData, UserFilters } from '@/types'
 import { UserRole } from '@/types'
 import type { PaginationParams, PaginatedResult, SortParams, FilterParams } from '@/utils/pagination'
-import { createPaginatedResult, createSearchQuery, createSortQuery, parseDateFilters } from '@/utils/pagination'
+import { createPaginatedResult, createSearchQuery, parseDateFilters } from '@/utils/pagination'
 
 // Mapeamento de UserRole para roleId
 const ROLE_ID_MAPPING: Record<UserRole, string> = {
