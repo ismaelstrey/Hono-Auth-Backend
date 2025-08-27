@@ -1,4 +1,5 @@
-import type { ApiResponse, ValidationError } from '@/types'
+import type { ApiResponse, ValidationError, User } from '@/types'
+import type { ZodIssue } from 'zod'
 
 /**
  * Gera um ID único usando timestamp e random
@@ -28,6 +29,16 @@ export const successResponse = <T>(data: T, message?: string): ApiResponse<T> =>
 }
 
 /**
+ * Converte ZodIssue para ValidationError
+ */
+export const convertZodIssueToValidationError = (zodIssues: ZodIssue[]): ValidationError[] => {
+  return zodIssues.map(issue => ({
+    field: issue.path.join('.') || 'unknown',
+    message: issue.message
+  }))
+}
+
+/**
  * Formata uma resposta de erro da API
  */
 export const errorResponse = (message: string, errors?: ValidationError[]): ApiResponse => {
@@ -42,7 +53,7 @@ export const errorResponse = (message: string, errors?: ValidationError[]): ApiR
 /**
  * Remove campos sensíveis de um objeto usuário
  */
-export const sanitizeUser = (user: any) => {
+export const sanitizeUser = (user: User): Omit<User, 'password'> => {
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const { password, ...sanitizedUser } = user
   return sanitizedUser

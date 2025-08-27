@@ -40,7 +40,7 @@ export interface FilterParams {
   dateFrom?: string
   dateTo?: string
   status?: string
-  [key: string]: any
+  [key: string]: string | Date | undefined
 }
 
 /**
@@ -198,7 +198,7 @@ export function validatePaginationParams(params: PaginationParams): string[] {
 /**
  * Cria query de busca para texto
  */
-export function createSearchQuery(search: string, fields: string[]): any {
+export function createSearchQuery(search: string, fields: string[]): Record<string, unknown> {
   if (!search || fields.length === 0) {
     return {}
   }
@@ -225,7 +225,7 @@ export function createSearchQuery(search: string, fields: string[]): any {
 /**
  * Cria query de ordenação para Prisma
  */
-export function createSortQuery(sortParams: SortParams): any {
+export function createSortQuery(sortParams: SortParams): Record<string, string> {
   if (!sortParams.sortBy) {
     return { createdAt: 'desc' } // Ordenação padrão
   }

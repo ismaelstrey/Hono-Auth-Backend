@@ -1,6 +1,6 @@
 import { userRepository } from '@/repositories/userRepository'
 import { hashPassword, comparePassword } from '@/utils/password'
-import { generateToken, generateRefreshToken, verifyRefreshToken, generateResetToken, verifyResetToken } from '@/utils/jwt'
+import { generateToken, generateRefreshToken, verifyRefreshToken } from '@/utils/jwt'
 import { sanitizeUser } from '@/utils/helpers'
 import { LogService } from '@/services/logService'
 import { emailService } from '@/services/emailService'
@@ -599,7 +599,7 @@ export class AuthService {
   /**
    * Obtém informações do usuário autenticado
    */
-  async getProfile(userId: string): Promise<User> {
+  async getProfile(userId: string): Promise<Omit<User, 'password'>> {
     const user = await userRepository.findById(userId)
     if (!user) {
       throw new Error('Usuário não encontrado')

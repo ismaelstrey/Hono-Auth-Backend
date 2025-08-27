@@ -595,8 +595,8 @@ class ProfileRepository {
       this.db.userProfile.count(),
       this.db.userProfile.count({ where: { avatar: { not: null } } }),
       this.db.userProfile.count({ where: { bio: { not: null } } }),
-       this.db.userProfile.count({ where: { phone: { not: null } } }),
-       this.db.userProfile.groupBy({
+      this.db.userProfile.count({ where: { phone: { not: null } } }),
+      this.db.userProfile.groupBy({
         by: ['userId'],
         _count: { id: true }
       })

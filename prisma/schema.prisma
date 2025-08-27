@@ -143,6 +143,7 @@ model Log {
   error       String?
   metadata    String?   // JSON string para dados adicionais
   level       String    @default("info") // error, warn, info, debug
+  details     String?   // JSON string para detalhes adicionais
   
   // Relacionamento com usuário
   user        User?     @relation(fields: [userId], references: [id], onDelete: SetNull)

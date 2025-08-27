@@ -16,11 +16,11 @@ export class UserController {
   static async handleListUsers(c: Context) {
     try {
       const query = (c.req as any).valid('query')
-      
+
       const pagination = extractPaginationParams(query)
       const sort = extractSortParams(query)
       const filters = extractFilterParams(query)
-      
+
       const result = await this.userService.listUsers(pagination, sort, filters)
 
       return c.json(successResponse(result))

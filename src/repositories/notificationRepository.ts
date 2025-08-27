@@ -140,12 +140,12 @@ export class NotificationRepository {
     if (filters.read !== undefined) where.readAt = filters.read ? { not: null } : null
 
     // Filtros de data de criação
-     const dateFilters = parseDateFilters(filters)
-     if (dateFilters.dateFrom || dateFilters.dateTo) {
-       where.createdAt = {}
-       if (dateFilters.dateFrom) where.createdAt.gte = dateFilters.dateFrom
-       if (dateFilters.dateTo) where.createdAt.lte = dateFilters.dateTo
-     }
+    const dateFilters = parseDateFilters(filters)
+    if (dateFilters.dateFrom || dateFilters.dateTo) {
+      where.createdAt = {}
+      if (dateFilters.dateFrom) where.createdAt.gte = dateFilters.dateFrom
+      if (dateFilters.dateTo) where.createdAt.lte = dateFilters.dateTo
+    }
 
     // Filtros avançados de data de leitura
     if (filters.readFrom || filters.readTo) {
@@ -239,15 +239,15 @@ export class NotificationRepository {
   /**
     * Constrói cláusula ORDER BY para notificações
     */
-   private buildNotificationOrderBy(sort: SortParams): any {
-     const validSortFields = ['createdAt', 'updatedAt', 'title', 'priority', 'status', 'readAt']
+  private buildNotificationOrderBy(sort: SortParams): any {
+    const validSortFields = ['createdAt', 'updatedAt', 'title', 'priority', 'status', 'readAt']
      
-     if (sort.sortBy && validSortFields.includes(sort.sortBy)) {
-       return { [sort.sortBy]: sort.sortOrder || 'desc' }
-     }
+    if (sort.sortBy && validSortFields.includes(sort.sortBy)) {
+      return { [sort.sortBy]: sort.sortOrder || 'desc' }
+    }
 
-     return { createdAt: 'desc' }
-   }
+    return { createdAt: 'desc' }
+  }
 
   /**
    * Atualiza status da notificação
@@ -343,11 +343,11 @@ export class NotificationRepository {
     // Processa estatísticas por status
     statusStats.forEach(stat => {
       switch (stat.status) {
-        case 'pending': stats.pending = stat._count.status; break
-        case 'sent': stats.sent = stat._count.status; break
-        case 'delivered': stats.delivered = stat._count.status; break
-        case 'failed': stats.failed = stat._count.status; break
-        case 'read': stats.read = stat._count.status; break
+      case 'pending': stats.pending = stat._count.status; break
+      case 'sent': stats.sent = stat._count.status; break
+      case 'delivered': stats.delivered = stat._count.status; break
+      case 'failed': stats.failed = stat._count.status; break
+      case 'read': stats.read = stat._count.status; break
       }
     })
 

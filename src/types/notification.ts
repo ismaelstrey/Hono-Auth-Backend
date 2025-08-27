@@ -67,7 +67,7 @@ export interface CreateNotificationData {
   typeId: string
   title: string
   message: string
-  data?: Record<string, any>
+  data?: Record<string, unknown>
   channel: NotificationChannel
   priority?: NotificationPriority
   scheduledFor?: Date

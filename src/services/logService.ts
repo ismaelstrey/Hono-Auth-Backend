@@ -54,7 +54,7 @@ export class LogService {
   /**
    * Registra log de erro
    */
-  async error(message: string, metadata?: any, context?: {
+  async error(message: string, metadata?: Record<string, unknown>, context?: {
     userId?: string
     action?: string
     resource?: string
@@ -79,7 +79,7 @@ export class LogService {
   /**
    * Registra log de aviso
    */
-  async warn(message: string, metadata?: any, context?: {
+  async warn(message: string, metadata?: Record<string, unknown>, context?: {
     userId?: string
     action?: string
     resource?: string
@@ -104,7 +104,7 @@ export class LogService {
   /**
    * Registra log de informação
    */
-  async info(message: string, metadata?: any, context?: {
+  async info(message: string, metadata?: Record<string, unknown>, context?: {
     userId?: string
     action?: string
     resource?: string
@@ -128,7 +128,7 @@ export class LogService {
   /**
    * Registra log de debug
    */
-  async debug(message: string, metadata?: any, context?: {
+  async debug(message: string, metadata?: Record<string, unknown>, context?: {
     userId?: string
     action?: string
     resource?: string

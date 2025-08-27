@@ -1,7 +1,7 @@
 import { notificationRepository } from '@/repositories/notificationRepository'
 import { emailService } from '@/services/emailService'
 import { LogService } from '@/services/logService'
-import { cacheService, CacheTTL } from '@/services/cacheService'
+import { cacheService, CacheKeys, CacheTTL } from '@/services/cacheService'
 import { logger } from '@/utils/logger'
 import type { PaginationParams, PaginatedResult, SortParams, FilterParams } from '@/utils/pagination'
 import type {
@@ -291,11 +291,11 @@ export class NotificationService {
    */
   async getUserPreferences(userId: string, typeId?: string): Promise<NotificationPreference | NotificationPreference[]> {
     const cacheKey = typeId 
-      ? `user_preferences:${userId}:${typeId}`
-      : `user_preferences:${userId}`
+      ? `${CacheKeys.NOTIFICATIONS.USER_PREFERENCES}:${userId}:${typeId}`
+      : `${CacheKeys.NOTIFICATIONS.USER_PREFERENCES}:${userId}`
     
     // Tentar buscar do cache
-    const cached = await cacheService.get<NotificationPreference | NotificationPreference[]>(cacheKey)
+    const cached = await cacheService.get(cacheKey)
     if (cached) {
       logger.debug('Cache hit para preferências de notificação', { userId, typeId })
       return cached
@@ -422,8 +422,8 @@ export class NotificationService {
   ): Promise<SendNotificationResult> {
     try {
       const result = await emailService.sendNotificationEmail({
-        email: (notification as unknown as { user?: { email?: string } }).user?.email as string,
-        name: (notification as unknown as { user?: { name?: string } }).user?.name as string,
+        email: (notification as Record<string, unknown>).user?.email as string,
+        name: (notification as Record<string, unknown>).user?.name as string,
         subject: template.subject || template.title || 'Notificação',
         htmlContent: template.htmlBody || `<p>${template.body}</p>`,
         textContent: template.body
@@ -451,7 +451,7 @@ export class NotificationService {
   ): Promise<SendNotificationResult> {
     // Simulação - em produção, integrar com serviço de push (Firebase, etc.)
     console.log('📱 PUSH NOTIFICATION (SIMULADO):')
-    console.log('Para:', (notification as unknown as { user?: { name?: string } }).user?.name)
+    console.log('Para:', (notification as Record<string, unknown>).user?.name)
     console.log('Título:', template.title || notification.title)
     console.log('Mensagem:', template.body || notification.message)
     
@@ -470,7 +470,7 @@ export class NotificationService {
   ): Promise<SendNotificationResult> {
     // Simulação - em produção, integrar com serviço de SMS (Twilio, etc.)
     console.log('📱 SMS NOTIFICATION (SIMULADO):')
-    console.log('Para:', (notification as unknown as { user?: { name?: string } }).user?.name)
+    console.log('Para:', (notification as Record<string, unknown>).user?.name)
     console.log('Mensagem:', template.body || notification.message)
     
     return {
@@ -483,8 +483,8 @@ export class NotificationService {
    * Envia notificação in-app
    */
   private async sendInAppNotification(
-    _notification: Notification,
-    _template: ProcessedTemplate
+    notification: Notification,
+    template: ProcessedTemplate
   ): Promise<SendNotificationResult> {
     // Para notificações in-app, apenas marcamos como enviada
     // O frontend buscará as notificações via API
@@ -519,12 +519,12 @@ export class NotificationService {
    */
   private async invalidateUserPreferencesCache(userId: string, typeId?: string): Promise<void> {
     const keys = [
-      `user_preferences:${userId}`,
-      `user_preferences:${userId}:${typeId}`
+      `${CacheKeys.NOTIFICATIONS.USER_PREFERENCES}:${userId}`,
+      `${CacheKeys.NOTIFICATIONS.USER_PREFERENCES}:${userId}:${typeId}`
     ]
     
     for (const key of keys) {
-      await cacheService.del(key)
+      await cacheService.delete(key)
     }
     
     logger.debug('Cache de preferências invalidado', { userId, typeId })

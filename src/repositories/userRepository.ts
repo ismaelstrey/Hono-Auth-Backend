@@ -59,7 +59,7 @@ export class UserRepository {
    */
   async create(userData: CreateUserData): Promise<User> {
     const roleId = ROLE_ID_MAPPING[userData.role || UserRole.USER]
-    
+
     const newUser = await prisma.user.create({
       data: {
         email: userData.email.toLowerCase(),
@@ -87,7 +87,7 @@ export class UserRepository {
         dataToUpdate.roleId = ROLE_ID_MAPPING[updateData.role]
         delete dataToUpdate.role
       }
-      
+
       const updatedUser = await prisma.user.update({
         where: { id },
         data: dataToUpdate,
@@ -179,7 +179,7 @@ export class UserRepository {
     }
 
     if (filters.emailVerified !== undefined) {
-      where.emailVerified = filters.emailVerified === 'true' || filters.emailVerified === true
+      where.emailVerified = typeof filters.emailVerified === 'string' ? filters.emailVerified === 'true' : !!filters.emailVerified
     }
 
     // Filtros de data de criação
@@ -220,7 +220,7 @@ export class UserRepository {
     }
 
     // Filtro para usuários nunca logaram
-    if (filters.neverLoggedIn === 'true' || filters.neverLoggedIn === true) {
+    if (filters.neverLoggedIn === 'true' || Boolean(filters.neverLoggedIn) === true) {
       where.lastLogin = null
     }
 
@@ -254,7 +254,7 @@ export class UserRepository {
 
     // Filtro por presença de perfil
     if (filters.hasProfile !== undefined) {
-      const hasProfile = filters.hasProfile === 'true' || filters.hasProfile === true
+      const hasProfile = typeof filters.hasProfile === 'string' ? filters.hasProfile === 'true' : Boolean(filters.hasProfile)
       if (hasProfile) {
         where.profile = { isNot: null }
       } else {
@@ -601,9 +601,8 @@ export class UserRepository {
    */
   private mapPrismaUserToUser(prismaUser: any): User {
     // Mapear role do relacionamento para UserRole enum
-    const roleName = prismaUser.role?.name || 'user'
     const userRole = ROLE_NAME_MAPPING[prismaUser.roleId] || UserRole.USER
-    
+
     return {
       id: prismaUser.id,
       email: prismaUser.email,

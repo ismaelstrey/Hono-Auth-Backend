@@ -1,7 +1,7 @@
-import crypto from 'crypto';
-import nodemailer from 'nodemailer';
-import { prisma } from '../config/database';
-import { config } from '../config/env';
+import crypto from 'crypto'
+import nodemailer from 'nodemailer'
+import { prisma } from '../config/database'
+import { config } from '../config/env'
 
 export interface EmailVerificationResult {
   success: boolean;
@@ -29,10 +29,10 @@ export interface SendNotificationEmailData {
 }
 
 class EmailService {
-  private transporter: nodemailer.Transporter | null = null;
+  private transporter: nodemailer.Transporter | null = null
 
   constructor() {
-    this.initializeTransporter();
+    this.initializeTransporter()
   }
 
   /**
@@ -40,60 +40,60 @@ class EmailService {
    */
   private initializeTransporter(): void {
     // Só configura o transporter se as variáveis de SMTP estiverem definidas
-    if (config.SMTP_HOST && config.SMTP_PORT && config.SMTP_USER && config.SMTP_PASS) {
-      this.transporter = nodemailer.createTransporter({
-        host: config.SMTP_HOST,
-        port: config.SMTP_PORT,
-        secure: config.SMTP_PORT === 465, // true para 465, false para outras portas
+    if (config && config.smtp.port && config.smtp.user && config.smtp.pass) {
+      this.transporter = nodemailer.createTransport({
+        host: config.smtp.host,
+        port: config.smtp.port,
+        secure: config.smtp.port === 465, // true para 465, false para outras portas
         auth: {
-          user: config.SMTP_USER,
-          pass: config.SMTP_PASS,
+          user: config.smtp.user,
+          pass: config.smtp.pass,
         },
-      });
+      })
 
       // Verifica a conexão SMTP
-      this.transporter.verify((error, success) => {
+      this.transporter?.verify((error) => {
         if (error) {
-          console.warn('⚠️ Erro na configuração SMTP:', error.message);
-          console.warn('📧 Emails serão simulados no console');
-          this.transporter = null;
+          console.warn('⚠️ Erro na configuração SMTP:', error.message)
+          console.warn('📧 Emails serão simulados no console')
+          this.transporter = null
         } else {
-          console.log('✅ Servidor SMTP configurado com sucesso');
+          console.log('✅ Servidor SMTP configurado com sucesso')
         }
-      });
+      })
     } else {
-      console.log('📧 Configurações SMTP não encontradas. Emails serão simulados no console.');
+      console.log('📧 Configurações SMTP não encontradas. Emails serão simulados no console.')
     }
   }
   /**
    * Gera um token de verificação de email seguro
    */
   generateVerificationToken(): string {
-    return crypto.randomBytes(32).toString('hex');
+    return crypto.randomBytes(32).toString('hex')
   }
 
   /**
    * Gera a data de expiração do token (24 horas a partir de agora)
    */
   generateTokenExpiration(): Date {
-    const expiration = new Date();
-    expiration.setHours(expiration.getHours() + 24);
-    return expiration;
+    const expiration = new Date()
+    expiration.setHours(expiration.getHours() + 24)
+    return expiration
   }
 
   /**
    * Salva o token de verificação no banco de dados
    */
   async saveVerificationToken(userId: string, token: string): Promise<void> {
-    const expires = this.generateTokenExpiration();
-    
+    const expires = this.generateTokenExpiration()
+
     await prisma.user.update({
       where: { id: userId },
       data: {
         emailVerificationToken: token,
         emailVerificationExpires: expires
       }
-    });
+    })
   }
 
   /**
@@ -108,13 +108,13 @@ class EmailService {
         },
         emailVerified: false
       }
-    });
+    })
 
     if (!user) {
-      return { valid: false };
+      return { valid: false }
     }
 
-    return { valid: true, userId: user.id };
+    return { valid: true, userId: user.id }
   }
 
   /**
@@ -128,38 +128,38 @@ class EmailService {
         emailVerificationToken: null,
         emailVerificationExpires: null
       }
-    });
+    })
   }
 
   /**
    * Gera um token de reset de senha seguro
    */
   generatePasswordResetToken(): string {
-    return crypto.randomBytes(32).toString('hex');
+    return crypto.randomBytes(32).toString('hex')
   }
 
   /**
    * Gera a data de expiração do token de reset (1 hora a partir de agora)
    */
   generatePasswordResetExpiration(): Date {
-    const expiration = new Date();
-    expiration.setHours(expiration.getHours() + 1);
-    return expiration;
+    const expiration = new Date()
+    expiration.setHours(expiration.getHours() + 1)
+    return expiration
   }
 
   /**
    * Salva o token de reset de senha no banco de dados
    */
   async savePasswordResetToken(userId: string, token: string): Promise<void> {
-    const expires = this.generatePasswordResetExpiration();
-    
+    const expires = this.generatePasswordResetExpiration()
+
     await prisma.user.update({
       where: { id: userId },
       data: {
         passwordResetToken: token,
         passwordResetExpires: expires
       }
-    });
+    })
   }
 
   /**
@@ -173,13 +173,13 @@ class EmailService {
           gt: new Date()
         }
       }
-    });
+    })
 
     if (!user) {
-      return { valid: false };
+      return { valid: false }
     }
 
-    return { valid: true, userId: user.id };
+    return { valid: true, userId: user.id }
   }
 
   /**
@@ -192,23 +192,23 @@ class EmailService {
         passwordResetToken: null,
         passwordResetExpires: null
       }
-    });
+    })
   }
 
   /**
    * Gera o link de verificação completo
    */
   generateVerificationLink(token: string): string {
-    const baseUrl = config.server.url || 'http://localhost:3002';
-    return `${baseUrl}/api/auth/verify-email?token=${token}`;
+    const baseUrl = config.server.url || 'http://localhost:3002'
+    return `${baseUrl}/api/auth/verify-email?token=${token}`
   }
 
   /**
    * Gera o link de reset de senha completo
    */
   generatePasswordResetLink(token: string): string {
-    const baseUrl = config.server.url || 'http://localhost:3002';
-    return `${baseUrl}/api/auth/reset-password?token=${token}`;
+    const baseUrl = config.server.url || 'http://localhost:3002'
+    return `${baseUrl}/api/auth/reset-password?token=${token}`
   }
 
   /**
@@ -279,7 +279,7 @@ class EmailService {
         </div>
       </body>
       </html>
-    `;
+    `
   }
 
   /**
@@ -371,7 +371,7 @@ class EmailService {
         </div>
       </body>
       </html>
-    `;
+    `
   }
 
   /**
@@ -379,48 +379,48 @@ class EmailService {
    */
   async sendVerificationEmail(data: SendVerificationEmailData): Promise<EmailVerificationResult> {
     try {
-      const verificationLink = this.generateVerificationLink(data.token);
-      const htmlContent = this.generateVerificationEmailTemplate(data.name, verificationLink);
-      const subject = 'Verificação de Email - Confirme sua conta';
+      const verificationLink = this.generateVerificationLink(data.token)
+      const htmlContent = this.generateVerificationEmailTemplate(data.name, verificationLink)
+      const subject = 'Verificação de Email - Confirme sua conta'
 
       // Se o transporter estiver configurado, envia email real
       if (this.transporter) {
         await this.transporter.sendMail({
-          from: config.SMTP_FROM || config.SMTP_USER,
+          from: config.smtp.from || config.smtp.user,
           to: data.email,
           subject: subject,
           html: htmlContent,
           text: `Olá ${data.name}, clique no link para verificar seu email: ${verificationLink}`
-        });
+        })
 
-        console.log(`✅ Email de verificação enviado para: ${data.email}`);
+        console.log(`✅ Email de verificação enviado para: ${data.email}`)
         return {
           success: true,
           message: 'Email de verificação enviado com sucesso'
-        };
+        }
       }
 
       // Fallback: simula o envio no console
-      console.log('\n📧 EMAIL DE VERIFICAÇÃO SIMULADO:');
-      console.log('Para:', data.email);
-      console.log('Nome:', data.name);
-      console.log('Assunto:', subject);
-      console.log('Token:', data.token);
-      console.log('Link de verificação:', verificationLink);
-      console.log('\n--- CONTEÚDO DO EMAIL ---');
-      console.log(htmlContent);
-      console.log('--- FIM DO EMAIL ---\n');
+      console.log('\n📧 EMAIL DE VERIFICAÇÃO SIMULADO:')
+      console.log('Para:', data.email)
+      console.log('Nome:', data.name)
+      console.log('Assunto:', subject)
+      console.log('Token:', data.token)
+      console.log('Link de verificação:', verificationLink)
+      console.log('\n--- CONTEÚDO DO EMAIL ---')
+      console.log(htmlContent)
+      console.log('--- FIM DO EMAIL ---\n')
 
       return {
         success: true,
         message: 'Email de verificação enviado com sucesso (simulado)'
-      };
+      }
     } catch (error) {
-      console.error('Erro ao enviar email de verificação:', error);
+      console.error('Erro ao enviar email de verificação:', error)
       return {
         success: false,
         message: 'Erro ao enviar email de verificação'
-      };
+      }
     }
   }
 
@@ -429,48 +429,48 @@ class EmailService {
    */
   async sendPasswordResetEmail(data: SendPasswordResetEmailData): Promise<EmailVerificationResult> {
     try {
-      const resetLink = this.generatePasswordResetLink(data.token);
-      const htmlContent = this.generatePasswordResetEmailTemplate(data.name, resetLink);
-      const subject = 'Redefinição de Senha - Recupere sua conta';
+      const resetLink = this.generatePasswordResetLink(data.token)
+      const htmlContent = this.generatePasswordResetEmailTemplate(data.name, resetLink)
+      const subject = 'Redefinição de Senha - Recupere sua conta'
 
       // Se o transporter estiver configurado, envia email real
       if (this.transporter) {
         await this.transporter.sendMail({
-          from: config.SMTP_FROM || config.SMTP_USER,
+          from: config.smtp.from || config.smtp.user,
           to: data.email,
           subject: subject,
           html: htmlContent,
           text: `Olá ${data.name}, clique no link para redefinir sua senha: ${resetLink}`
-        });
+        })
 
-        console.log(`✅ Email de reset de senha enviado para: ${data.email}`);
+        console.log(`✅ Email de reset de senha enviado para: ${data.email}`)
         return {
           success: true,
           message: 'Email de reset de senha enviado com sucesso'
-        };
+        }
       }
 
       // Fallback: simula o envio no console
-      console.log('\n🔐 EMAIL DE RESET DE SENHA SIMULADO:');
-      console.log('Para:', data.email);
-      console.log('Nome:', data.name);
-      console.log('Assunto:', subject);
-      console.log('Token:', data.token);
-      console.log('Link de reset:', resetLink);
-      console.log('\n--- CONTEÚDO DO EMAIL ---');
-      console.log(htmlContent);
-      console.log('--- FIM DO EMAIL ---\n');
+      console.log('\n🔐 EMAIL DE RESET DE SENHA SIMULADO:')
+      console.log('Para:', data.email)
+      console.log('Nome:', data.name)
+      console.log('Assunto:', subject)
+      console.log('Token:', data.token)
+      console.log('Link de reset:', resetLink)
+      console.log('\n--- CONTEÚDO DO EMAIL ---')
+      console.log(htmlContent)
+      console.log('--- FIM DO EMAIL ---\n')
 
       return {
         success: true,
         message: 'Email de reset de senha enviado com sucesso (simulado)'
-      };
+      }
     } catch (error) {
-      console.error('Erro ao enviar email de reset de senha:', error);
+      console.error('Erro ao enviar email de reset de senha:', error)
       return {
         success: false,
         message: 'Erro ao enviar email de reset de senha'
-      };
+      }
     }
   }
 
@@ -482,39 +482,39 @@ class EmailService {
       // Se o transporter estiver configurado, envia email real
       if (this.transporter) {
         await this.transporter.sendMail({
-          from: config.SMTP_FROM || config.SMTP_USER,
+          from: config.smtp.from || config.smtp.user,
           to: data.email,
           subject: data.subject,
           html: data.htmlContent,
           text: data.textContent || data.subject
-        });
+        })
 
-        console.log(`✅ Email de notificação enviado para: ${data.email}`);
+        console.log(`✅ Email de notificação enviado para: ${data.email}`)
         return {
           success: true,
           message: 'Email de notificação enviado com sucesso'
-        };
+        }
       }
 
       // Fallback: simula o envio no console
-      console.log('\n📧 EMAIL DE NOTIFICAÇÃO SIMULADO:');
-      console.log('Para:', data.email);
-      console.log('Nome:', data.name);
-      console.log('Assunto:', data.subject);
-      console.log('\n--- CONTEÚDO DO EMAIL ---');
-      console.log(data.htmlContent);
-      console.log('--- FIM DO EMAIL ---\n');
+      console.log('\n📧 EMAIL DE NOTIFICAÇÃO SIMULADO:')
+      console.log('Para:', data.email)
+      console.log('Nome:', data.name)
+      console.log('Assunto:', data.subject)
+      console.log('\n--- CONTEÚDO DO EMAIL ---')
+      console.log(data.htmlContent)
+      console.log('--- FIM DO EMAIL ---\n')
 
       return {
         success: true,
         message: 'Email de notificação enviado com sucesso (simulado)'
-      };
+      }
     } catch (error) {
-      console.error('Erro ao enviar email de notificação:', error);
+      console.error('Erro ao enviar email de notificação:', error)
       return {
         success: false,
         message: 'Erro ao enviar email de notificação'
-      };
+      }
     }
   }
 
@@ -525,16 +525,16 @@ class EmailService {
     const user = await prisma.user.findUnique({
       where: { id: userId },
       select: { emailVerified: true }
-    });
+    })
 
-    return user?.emailVerified || false;
+    return user?.emailVerified || false
   }
 
   /**
    * Remove tokens expirados (verificação e reset de senha)
    */
   async cleanupExpiredTokens(): Promise<{ emailVerification: number; passwordReset: number }> {
-    const now = new Date();
+    const now = new Date()
 
     // Limpar tokens de verificação de email expirados
     const emailVerificationResult = await prisma.user.updateMany({
@@ -547,7 +547,7 @@ class EmailService {
         emailVerificationToken: null,
         emailVerificationExpires: null
       }
-    });
+    })
 
     // Limpar tokens de reset de senha expirados
     const passwordResetResult = await prisma.user.updateMany({
@@ -560,14 +560,14 @@ class EmailService {
         passwordResetToken: null,
         passwordResetExpires: null
       }
-    });
+    })
 
     return {
       emailVerification: emailVerificationResult.count,
       passwordReset: passwordResetResult.count
-    };
+    }
   }
 }
 
-export const emailService = new EmailService();
-export default emailService;
+export const emailService = new EmailService()
+export default emailService

@@ -13,13 +13,13 @@ export class AuthController {
   static async handleRegister(c: Context) {
     try {
       const userData = (c.req as any).valid('json')
-      
+
       // Captura o IP do usuário
-      const ip = c.req.header('x-forwarded-for') || 
-                c.req.header('x-real-ip') || 
-                c.env?.CF_CONNECTING_IP || 
-                'unknown'
-      
+      const ip = c.req.header('x-forwarded-for') ||
+        c.req.header('x-real-ip') ||
+        c.env?.CF_CONNECTING_IP ||
+        'unknown'
+
       const result = await authService.register(userData, ip)
 
       return c.json(successResponse(result, 'Usuário registrado com sucesso'), 201)
@@ -35,13 +35,13 @@ export class AuthController {
   static async handleLogin(c: Context) {
     try {
       const loginData = (c.req as any).valid('json')
-      
+
       // Captura o IP do usuário
-      const ip = c.req.header('x-forwarded-for') || 
-                c.req.header('x-real-ip') || 
-                c.env?.CF_CONNECTING_IP || 
-                'unknown'
-      
+      const ip = c.req.header('x-forwarded-for') ||
+        c.req.header('x-real-ip') ||
+        c.env?.CF_CONNECTING_IP ||
+        'unknown'
+
       const result = await authService.login(loginData, ip)
 
       return c.json(successResponse(result, 'Login realizado com sucesso'))
@@ -86,13 +86,13 @@ export class AuthController {
   static async handleForgotPassword(c: Context) {
     try {
       const data = (c.req as any).valid('json')
-      
+
       // Captura o IP do usuário
-      const ip = c.req.header('x-forwarded-for') || 
-                c.req.header('x-real-ip') || 
-                c.env?.CF_CONNECTING_IP || 
-                'unknown'
-      
+      const ip = c.req.header('x-forwarded-for') ||
+        c.req.header('x-real-ip') ||
+        c.env?.CF_CONNECTING_IP ||
+        'unknown'
+
       const result = await authService.forgotPassword(data, ip)
 
       return c.json(successResponse(result))
@@ -108,13 +108,13 @@ export class AuthController {
   static async handleResetPassword(c: Context) {
     try {
       const data = (c.req as any).valid('json')
-      
+
       // Captura o IP do usuário
-      const ip = c.req.header('x-forwarded-for') || 
-                c.req.header('x-real-ip') || 
-                c.env?.CF_CONNECTING_IP || 
-                'unknown'
-      
+      const ip = c.req.header('x-forwarded-for') ||
+        c.req.header('x-real-ip') ||
+        c.env?.CF_CONNECTING_IP ||
+        'unknown'
+
       const result = await authService.resetPassword(data, ip)
 
       return c.json(successResponse(result))

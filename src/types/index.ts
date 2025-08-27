@@ -9,7 +9,7 @@ export interface User {
   emailVerified: boolean
   failedLoginAttempts?: number
   lockedUntil?: Date
-  settings?: any
+  settings?: Record<string, unknown>
   createdAt: Date
   updatedAt: Date
   lastLogin?: Date
@@ -81,7 +81,7 @@ export interface LogEntry {
   duration?: number
   error?: string
   level?: string // error, warn, info, debug
-  metadata?: any // dados adicionais em formato JSON
+  metadata?: Record<string, unknown> // dados adicionais em formato JSON
   user?: {
     id: string
     name: string
@@ -125,7 +125,7 @@ export interface ValidationError {
 }
 
 // Resposta padrão da API
-export interface ApiResponse<T = any> {
+export interface ApiResponse<T = unknown> {
   success: boolean
   data?: T
   message?: string

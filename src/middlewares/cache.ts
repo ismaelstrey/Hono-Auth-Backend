@@ -26,15 +26,15 @@ function generateCacheKey(c: Context, options?: CacheOptions): string {
   const path = c.req.path
   const query = c.req.query()
   const user = c.get('user')
-  
+
   // Inclui parâmetros de variação se especificados
-  const varyData: Record<string, any> = {}
+  const varyData: Record<string, string> = {}
   if (options?.varyBy) {
     for (const header of options.varyBy) {
-      varyData[header] = c.req.header(header)
+      varyData[header] = c.req.header(header) || ''
     }
   }
-  
+
   // Inclui ID do usuário para cache personalizado
   if (user?.id) {
     varyData.userId = user.id
@@ -85,7 +85,7 @@ function shouldCacheResponse(c: Context, status: number): boolean {
 export function responseCache(options: CacheOptions = {}): (c: Context, next: Next) => Promise<void> {
   const defaultTTL = options.ttl || CacheTTL.MEDIUM
 
-  return async (c: Context, next: Next) => {
+  return async (c: Context, next: Next): Promise<void> => {
     // Verifica condições para usar cache
     if (options.condition && !options.condition(c)) {
       return next()
@@ -108,7 +108,7 @@ export function responseCache(options: CacheOptions = {}): (c: Context, next: Ne
       const cached = await cacheService.get<{
         status: number
         headers: Record<string, string>
-        body: any
+        body: unknown
       }>(cacheKey)
 
       if (cached) {
@@ -116,14 +116,16 @@ export function responseCache(options: CacheOptions = {}): (c: Context, next: Ne
         Object.entries(cached.headers).forEach(([key, value]) => {
           c.res.headers.set(key, value)
         })
-        
+
         // Adiciona header indicando cache hit
         c.res.headers.set('X-Cache', 'HIT')
         c.res.headers.set('X-Cache-Key', cacheKey)
-        
+
         logger.debug(`Cache hit para ${c.req.method} ${c.req.path}`)
-        
-        return c.json(cached.body, cached.status)
+
+        c.json(cached.body as Record<string, unknown>)
+        return
+
       }
 
       // Cache miss - executa a requisição
@@ -145,8 +147,8 @@ export function responseCache(options: CacheOptions = {}): (c: Context, next: Ne
       const headers: Record<string, string> = {}
       c.res.headers.forEach((value, key) => {
         // Só inclui headers seguros para cache
-        if (!key.toLowerCase().startsWith('set-cookie') && 
-            !key.toLowerCase().startsWith('authorization')) {
+        if (!key.toLowerCase().startsWith('set-cookie') &&
+          !key.toLowerCase().startsWith('authorization')) {
           headers[key] = value
         }
       })
@@ -159,11 +161,11 @@ export function responseCache(options: CacheOptions = {}): (c: Context, next: Ne
       }
 
       await cacheService.set(cacheKey, cacheData, defaultTTL)
-      
+
       // Adiciona headers de cache
       c.res.headers.set('X-Cache', 'MISS')
       c.res.headers.set('X-Cache-Key', cacheKey)
-      
+
       logger.debug(`Cache miss para ${c.req.method} ${c.req.path} - armazenado com TTL ${defaultTTL}s`)
 
     } catch (error) {
@@ -184,20 +186,18 @@ export function paginatedCache(ttl: number = CacheTTL.SHORT) {
       const path = c.req.path
       const page = c.req.query('page') || '1'
       const limit = c.req.query('limit') || '10'
-      const search = c.req.query('search') || ''
-      const sort = c.req.query('sort') || ''
-      const order = c.req.query('order') || ''
-      
+      // Filtros de paginação
+
       // Inclui todos os filtros na chave
       const filters = Object.entries(c.req.query())
         .filter(([key]) => !['page', 'limit'].includes(key))
         .sort(([a], [b]) => a.localeCompare(b))
         .map(([key, value]) => `${key}=${value}`)
         .join('&')
-      
+
       const user = c.get('user')
       const userId = user?.id || 'anonymous'
-      
+
       return `paginated:${path}:${userId}:${page}:${limit}:${createHash('md5').update(filters).digest('hex')}`
     },
     condition: (c: Context) => {
@@ -218,13 +218,13 @@ export function userCache(ttl: number = CacheTTL.MEDIUM) {
       const path = c.req.path
       const user = c.get('user')
       const userId = user?.id || 'anonymous'
-      
+
       // Para rotas de usuário específico
       if (path.includes('/users/')) {
         const targetUserId = c.req.param('id')
         return CacheKeys.user(targetUserId || userId)
       }
-      
+
       return `user_data:${userId}:${path}`
     },
     condition: (c: Context) => {
@@ -243,14 +243,14 @@ export function statsCache(ttl: number = CacheTTL.LONG) {
     keyGenerator: (c: Context) => {
       const path = c.req.path
       const query = c.req.query()
-      
+
       // Remove parâmetros sensíveis ao tempo
-      const { page, limit, ...filters } = query
-      
+      const { page: _page, limit: _limit, ...filters } = query
+
       const filtersHash = createHash('md5')
         .update(JSON.stringify(filters))
         .digest('hex')
-      
+
       return `stats:${path}:${filtersHash}`
     }
   })
@@ -267,9 +267,9 @@ export async function invalidateUserCache(userId: string): Promise<void> {
       CacheKeys.userPermissions(userId),
       CacheKeys.userSessions(userId)
     ]
-    
+
     await Promise.all(keys.map(key => cacheService.del(key)))
-    
+
     logger.info(`Cache invalidado para usuário ${userId}`)
   } catch (error) {
     logger.error('Erro ao invalidar cache do usuário:', error)
@@ -295,14 +295,14 @@ export async function invalidateListCache(entity: string): Promise<void> {
 export function cacheInvalidation(entity: string) {
   return async (c: Context, next: Next) => {
     await next()
-    
+
     // Só invalida cache em operações de sucesso
     if (c.res.status >= 200 && c.res.status < 300) {
       const method = c.req.method
-      
+
       if (['POST', 'PUT', 'PATCH', 'DELETE'].includes(method)) {
         await invalidateListCache(entity)
-        
+
         // Se há ID na URL, invalida cache específico
         const id = c.req.param('id')
         if (id) {
@@ -331,7 +331,7 @@ export function setCacheHeaders(c: Context, maxAge: number = CacheTTL.MEDIUM): v
 export function cacheHeaders(maxAge: number = CacheTTL.MEDIUM) {
   return async (c: Context, next: Next) => {
     await next()
-    
+
     if (c.res.status >= 200 && c.res.status < 300) {
       setCacheHeaders(c, maxAge)
     }

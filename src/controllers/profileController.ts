@@ -1,10 +1,10 @@
 import { Context } from 'hono'
-import { profileService, ProfileData } from '@/services/profileService'
+import { profileService, ProfileResponse } from '@/services/profileService'
 import { AppError, AuthenticationError, AuthorizationError } from '@/utils/errors'
 import { logger } from '@/utils/logger'
 import { z } from 'zod'
 import { extractPaginationParams, extractSortParams, extractFilterParams } from '@/utils/pagination'
-import { successResponse, errorResponse } from '@/utils/helpers'
+import { successResponse, errorResponse, convertZodIssueToValidationError } from '@/utils/helpers'
 
 // Schemas de validação
 const addressSchema = z.object({
@@ -42,18 +42,18 @@ const profileSchema = z.object({
   firstName: z.string().min(2).max(50).optional(),
   lastName: z.string().min(2).max(50).optional(),
   bio: z.string().max(500).optional(),
-  phone: z.string().regex(/^[\+]?[1-9][\d\s\-\(\)]{8,15}$/).optional(),
+  phone: z.string().regex(/^[+]?[1-9][\d\s\-()]{8,15}$/).optional(),
   dateOfBirth: z.string().datetime().optional(),
   address: addressSchema,
   preferences: preferencesSchema,
   socialLinks: socialLinksSchema
 })
 
-const querySchema = z.object({
-  page: z.string().transform(val => parseInt(val) || 1).optional(),
-  limit: z.string().transform(val => Math.min(parseInt(val) || 10, 50)).optional(),
-  search: z.string().optional()
-})
+// const querySchema = z.object({
+//   page: z.string().transform(val => parseInt(val) || 1).optional(),
+//   limit: z.string().transform(val => Math.min(parseInt(val) || 10, 50)).optional(),
+//   search: z.string().optional()
+// })
 
 class ProfileController {
   /**
@@ -83,12 +83,12 @@ class ProfileController {
       }, 201)
     } catch (error) {
       logger.error('Erro no controller createProfile', { error })
-      
+
       if (error instanceof z.ZodError) {
         return c.json({
           success: false,
           message: 'Dados inválidos',
-          errors: error.errors
+          errors: convertZodIssueToValidationError(error.errors)
         }, 400)
       }
 
@@ -130,7 +130,7 @@ class ProfileController {
       })
     } catch (error) {
       logger.error('Erro no controller getMyProfile', { error })
-      
+
       if (error instanceof AppError) {
         return c.json({
           success: false,
@@ -151,7 +151,7 @@ class ProfileController {
   async getProfileById(c: Context) {
     try {
       const { id } = c.req.param()
-      
+
       const profile = await profileService.getProfileById(id)
       if (!profile) {
         return c.json({
@@ -161,7 +161,7 @@ class ProfileController {
       }
 
       // Verificar privacidade do perfil
-      const preferences = profile.preferences
+      const preferences = profile.preferences ? JSON.parse(profile.preferences as unknown as string) : null
       if (preferences?.privacy?.profileVisibility === 'private') {
         const user = c.get('user')
         if (!user || user.id !== profile.userId) {
@@ -181,7 +181,7 @@ class ProfileController {
       })
     } catch (error) {
       logger.error('Erro no controller getProfileById', { error })
-      
+
       if (error instanceof AppError) {
         return c.json({
           success: false,
@@ -223,12 +223,12 @@ class ProfileController {
       })
     } catch (error) {
       logger.error('Erro no controller updateProfile', { error })
-      
+
       if (error instanceof z.ZodError) {
         return c.json({
           success: false,
           message: 'Dados inválidos',
-          errors: error.errors
+          errors: convertZodIssueToValidationError(error.errors)
         }, 400)
       }
 
@@ -273,7 +273,7 @@ class ProfileController {
       })
     } catch (error) {
       logger.error('Erro no controller upsertProfile', { error })
-      
+
       if (error instanceof z.ZodError) {
         return c.json({
           success: false,
@@ -321,9 +321,9 @@ class ProfileController {
       return c.json(successResponse(result))
     } catch (error) {
       logger.error('Erro no controller listProfiles', { error })
-      
+
       if (error instanceof z.ZodError) {
-        return c.json(errorResponse('Parâmetros inválidos', error.errors), 400)
+        return c.json(errorResponse('Parâmetros inválidos', convertZodIssueToValidationError(error.errors)), 400)
       }
 
       if (error instanceof AppError) {
@@ -357,7 +357,7 @@ class ProfileController {
       })
     } catch (error) {
       logger.error('Erro no controller getProfileStats', { error })
-      
+
       if (error instanceof AppError) {
         return c.json({
           success: false,
@@ -394,7 +394,7 @@ class ProfileController {
       })
     } catch (error) {
       logger.error('Erro no controller deleteProfile', { error })
-      
+
       if (error instanceof AppError) {
         return c.json({
           success: false,
@@ -447,11 +447,11 @@ class ProfileController {
       })
     } catch (error) {
       logger.error('Erro no upload de avatar', { error })
-      
+
       if (error instanceof AppError) {
         return c.json({ success: false, message: error.message }, error.statusCode as any)
       }
-      
+
       return c.json({ success: false, message: 'Erro interno do servidor' }, 500)
     }
   }
@@ -459,13 +459,13 @@ class ProfileController {
   /**
    * Filtrar dados sensíveis baseado nas preferências de privacidade
    */
-  private filterSensitiveData(profile: any) {
+  private filterSensitiveData(profile: ProfileResponse) {
     const filtered = { ...profile }
-    const preferences = profile.preferences
+    const preferences = profile.preferences as Record<string, any> | null
 
     if (preferences?.privacy) {
       if (!preferences.privacy.showEmail) {
-        filtered.user.email = null
+        filtered.user.email = ''
       }
       if (!preferences.privacy.showPhone) {
         filtered.phone = null

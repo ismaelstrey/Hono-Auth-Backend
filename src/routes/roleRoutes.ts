@@ -91,7 +91,7 @@ roleRoutes.post(
 roleRoutes.get('/health', async (c) => {
   try {
     // Testa se consegue acessar o serviço de permissões
-    const roles = await RoleController.listRoles(c)
+    await RoleController.listRoles(c)
     
     return c.json({
       success: true,

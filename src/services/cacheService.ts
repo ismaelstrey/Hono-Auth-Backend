@@ -6,20 +6,20 @@ import { logger } from '../utils/logger'
  */
 interface CacheService {
   get<T>(key: string): Promise<T | null>
-  set(key: string, value: any, ttlSeconds?: number): Promise<void>
+  set(key: string, value: unknown, ttlSeconds?: number): Promise<void>
   del(key: string): Promise<void>
   clear(): Promise<void>
   exists(key: string): Promise<boolean>
   increment(key: string, ttlSeconds?: number): Promise<number>
   getMany<T>(keys: string[]): Promise<(T | null)[]>
-  setMany(items: Array<{ key: string; value: any; ttl?: number }>): Promise<void>
+  setMany(items: Array<{ key: string; value: unknown; ttl?: number }>): Promise<void>
 }
 
 /**
  * Implementação de cache em memória
  */
 class MemoryCache implements CacheService {
-  private cache = new Map<string, { value: any; expires: number | null }>()
+  private cache = new Map<string, { value: unknown; expires: number | null }>()
   private cleanupInterval: NodeJS.Timeout
 
   constructor() {
@@ -41,7 +41,7 @@ class MemoryCache implements CacheService {
     return item.value as T
   }
 
-  async set(key: string, value: any, ttlSeconds?: number): Promise<void> {
+  async set(key: string, value: unknown, ttlSeconds?: number): Promise<void> {
     const expires = ttlSeconds ? Date.now() + (ttlSeconds * 1000) : null
     this.cache.set(key, { value, expires })
   }
@@ -77,7 +77,7 @@ class MemoryCache implements CacheService {
     return Promise.all(keys.map(key => this.get<T>(key)))
   }
 
-  async setMany(items: Array<{ key: string; value: any; ttl?: number }>): Promise<void> {
+  async setMany(items: Array<{ key: string; value: unknown; ttl?: number }>): Promise<void> {
     for (const item of items) {
       await this.set(item.key, item.value, item.ttl)
     }
@@ -102,7 +102,7 @@ class MemoryCache implements CacheService {
  * Implementação de cache com Redis
  */
 class RedisCache implements CacheService {
-  private redis: any
+  private redis: import('ioredis').Redis | null = null
   private isConnected = false
 
   constructor() {
@@ -112,8 +112,13 @@ class RedisCache implements CacheService {
   private async initRedis(): Promise<void> {
     try {
       // Importação dinâmica do Redis
-      const Redis = await import('ioredis')
-      this.redis = new Redis.default(env.REDIS_URL!)
+      const Redis = await import('ioredis').catch(() => {
+        throw new Error('Please install ioredis package: npm install ioredis @types/ioredis')
+      })
+      if (!env.REDIS_URL) {
+        throw new Error('REDIS_URL não configurada')
+      }
+      this.redis = new Redis.default(env.REDIS_URL)
       
       this.redis.on('connect', () => {
         this.isConnected = true
@@ -137,7 +142,7 @@ class RedisCache implements CacheService {
   }
 
   async get<T>(key: string): Promise<T | null> {
-    if (!this.isConnected) return null
+    if (!this.isConnected || !this.redis) return null
     
     try {
       const value = await this.redis.get(key)
@@ -148,8 +153,8 @@ class RedisCache implements CacheService {
     }
   }
 
-  async set(key: string, value: any, ttlSeconds?: number): Promise<void> {
-    if (!this.isConnected) return
+  async set(key: string, value: unknown, ttlSeconds?: number): Promise<void> {
+    if (!this.isConnected || !this.redis) return
     
     try {
       const serialized = JSON.stringify(value)
@@ -164,7 +169,7 @@ class RedisCache implements CacheService {
   }
 
   async del(key: string): Promise<void> {
-    if (!this.isConnected) return
+    if (!this.isConnected || !this.redis) return
     
     try {
       await this.redis.del(key)
@@ -174,7 +179,7 @@ class RedisCache implements CacheService {
   }
 
   async clear(): Promise<void> {
-    if (!this.isConnected) return
+    if (!this.isConnected || !this.redis) return
     
     try {
       await this.redis.flushdb()
@@ -184,7 +189,7 @@ class RedisCache implements CacheService {
   }
 
   async exists(key: string): Promise<boolean> {
-    if (!this.isConnected) return false
+    if (!this.isConnected || !this.redis) return false
     
     try {
       const result = await this.redis.exists(key)
@@ -196,7 +201,7 @@ class RedisCache implements CacheService {
   }
 
   async increment(key: string, ttlSeconds?: number): Promise<number> {
-    if (!this.isConnected) return 0
+    if (!this.isConnected || !this.redis) return 0
     
     try {
       const result = await this.redis.incr(key)
@@ -211,7 +216,7 @@ class RedisCache implements CacheService {
   }
 
   async getMany<T>(keys: string[]): Promise<(T | null)[]> {
-    if (!this.isConnected || keys.length === 0) return []
+    if (!this.isConnected || !this.redis || keys.length === 0) return []
     
     try {
       const values = await this.redis.mget(...keys)
@@ -224,8 +229,8 @@ class RedisCache implements CacheService {
     }
   }
 
-  async setMany(items: Array<{ key: string; value: any; ttl?: number }>): Promise<void> {
-    if (!this.isConnected || items.length === 0) return
+  async setMany(items: Array<{ key: string; value: unknown; ttl?: number }>): Promise<void> {
+    if (!this.isConnected || !this.redis || items.length === 0) return
     
     try {
       const pipeline = this.redis.pipeline()
@@ -273,7 +278,7 @@ class HybridCache implements CacheService {
     return this.activeCache.get<T>(key)
   }
 
-  async set(key: string, value: any, ttlSeconds?: number): Promise<void> {
+  async set(key: string, value: unknown, ttlSeconds?: number): Promise<void> {
     return this.activeCache.set(key, value, ttlSeconds)
   }
 
@@ -297,7 +302,7 @@ class HybridCache implements CacheService {
     return this.activeCache.getMany<T>(keys)
   }
 
-  async setMany(items: Array<{ key: string; value: any; ttl?: number }>): Promise<void> {
+  async setMany(items: Array<{ key: string; value: unknown; ttl?: number }>): Promise<void> {
     return this.activeCache.setMany(items)
   }
 
@@ -372,14 +377,14 @@ export const CacheTTL = {
 /**
  * Decorator para cache automático de métodos
  */
-export function Cached(ttl: number = CacheTTL.MEDIUM, keyGenerator?: (...args: any[]) => string) {
-  return function (target: any, propertyName: string, descriptor: PropertyDescriptor) {
+export function Cached(ttl: number = CacheTTL.MEDIUM, keyGenerator?: (...args: unknown[]) => string) {
+  return function (target: unknown, propertyName: string, descriptor: PropertyDescriptor) {
     const method = descriptor.value
     
-    descriptor.value = async function (...args: any[]) {
+    descriptor.value = async function (...args: unknown[]) {
       const cacheKey = keyGenerator 
         ? keyGenerator(...args)
-        : `${target.constructor.name}:${propertyName}:${JSON.stringify(args)}`
+        : `${(target as { constructor: { name: string } }).constructor.name}:${propertyName}:${JSON.stringify(args)}`
       
       // Tenta buscar no cache
       const cached = await cacheService.get(cacheKey)

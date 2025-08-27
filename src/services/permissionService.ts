@@ -1,5 +1,4 @@
 import { PrismaClient } from '@prisma/client'
-import type { JWTPayload } from '@/types'
 
 const prisma = new PrismaClient()
 

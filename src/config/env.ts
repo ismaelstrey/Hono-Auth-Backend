@@ -8,57 +8,58 @@ const envSchema = z.object({
   NODE_ENV: z.enum(['development', 'production', 'test']).default('development'),
   PORT: z.string().transform(Number).default('9000'),
   HOST: z.string().default('localhost'),
-  
+
   // Configurações JWT
   JWT_SECRET: z.string().min(32, 'JWT_SECRET deve ter pelo menos 32 caracteres'),
   JWT_EXPIRES_IN: z.string().default('1h'),
   JWT_REFRESH_SECRET: z.string().min(32, 'JWT_REFRESH_SECRET deve ter pelo menos 32 caracteres'),
   JWT_REFRESH_EXPIRES_IN: z.string().default('7d'),
-  
+
   // Configurações de senha
   BCRYPT_ROUNDS: z.string().transform(Number).default('12'),
-  
+
   // Configurações de email (para futuras implementações)
   SMTP_HOST: z.string().optional(),
   SMTP_PORT: z.string().transform(Number).optional(),
   SMTP_USER: z.string().optional(),
   SMTP_PASS: z.string().optional(),
   SMTP_FROM: z.string().email().optional(),
-  
+  SMTP_FROM_NAME: z.string().optional(),
+
   // Configurações de rate limiting
   RATE_LIMIT_WINDOW_MS: z.string().transform(Number).default('900000'), // 15 minutos
   RATE_LIMIT_MAX_REQUESTS: z.string().transform(Number).default('100'),
   RATE_LIMIT_AUTH_MAX: z.string().transform(Number).default('5'),
   RATE_LIMIT_REGISTRATION_MAX: z.string().transform(Number).default('3'),
   RATE_LIMIT_PASSWORD_RESET_MAX: z.string().transform(Number).default('3'),
-  
+
   // Configurações de CORS
   CORS_ORIGIN: z.string().default('*'),
   CORS_CREDENTIALS: z.string().transform(val => val === 'true').default('true'),
-  
+
   // Configurações de logging
   LOG_LEVEL: z.enum(['error', 'warn', 'info', 'debug']).default('info'),
   LOG_MAX_ENTRIES: z.string().transform(Number).default('1000'),
-  
+
   // Configurações de segurança
   SECURE_HEADERS: z.string().transform(val => val === 'true').default('true'),
-  
+
   // Configurações de upload (para futuras implementações)
   MAX_FILE_SIZE: z.string().transform(Number).default('5242880'), // 5MB
   ALLOWED_FILE_TYPES: z.string().default('image/jpeg,image/png,image/gif,image/webp'),
-  
+
   // URL base da aplicação
   APP_URL: z.string().url().default('http://localhost:9000'),
-  
+
   // Configurações de banco de dados (para futuras implementações com Prisma)
   DATABASE_URL: z.string().optional(),
-  
+
   // Configurações de cache (para futuras implementações)
   REDIS_URL: z.string().optional(),
-  
+
   // Configurações de monitoramento
   ENABLE_METRICS: z.string().transform(val => val === 'true').default('false'),
-  
+
   // Configurações de desenvolvimento
   ENABLE_SWAGGER: z.string().transform(val => val === 'true').default('true'),
   SWAGGER_PATH: z.string().default('/docs'),
@@ -89,6 +90,7 @@ function loadEnv(): EnvConfig {
       SMTP_USER: process.env.SMTP_USER,
       SMTP_PASS: process.env.SMTP_PASS,
       SMTP_FROM: process.env.SMTP_FROM,
+      SMTP_FROM_NAME: process.env.SMTP_FROM_NAME,
       RATE_LIMIT_WINDOW_MS: process.env.RATE_LIMIT_WINDOW_MS,
       RATE_LIMIT_MAX_REQUESTS: process.env.RATE_LIMIT_MAX_REQUESTS,
       RATE_LIMIT_AUTH_MAX: process.env.RATE_LIMIT_AUTH_MAX,
@@ -167,6 +169,14 @@ export const config = {
     expiresIn: env.JWT_EXPIRES_IN,
     refreshSecret: env.JWT_REFRESH_SECRET,
     refreshExpiresIn: env.JWT_REFRESH_EXPIRES_IN
+  },
+  smtp: {
+    host: env.SMTP_HOST,
+    port: env.SMTP_PORT,
+    user: env.SMTP_USER,
+    pass: env.SMTP_PASS,
+    from: env.SMTP_FROM,
+    fromName: env.SMTP_FROM_NAME
   },
   security: {
     bcryptRounds: env.BCRYPT_ROUNDS,

@@ -9,14 +9,14 @@ export abstract class AppError extends Error {
   public readonly statusCode: number
   public readonly isOperational: boolean
   public readonly code?: string
-  public readonly details?: any
+  public readonly details?: unknown
 
   constructor(
     message: string,
     statusCode: number,
     isOperational = true,
     code?: string,
-    details?: any
+    details?: unknown
   ) {
     super(message)
     this.statusCode = statusCode
@@ -33,7 +33,7 @@ export abstract class AppError extends Error {
  * Erro de validação de dados
  */
 export class ValidationError extends AppError {
-  constructor(message: string, details?: any) {
+  constructor(message: string, details?: unknown) {
     super(message, 400, true, 'VALIDATION_ERROR', details)
     this.name = 'ValidationError'
   }
@@ -93,7 +93,7 @@ export class RateLimitError extends AppError {
  * Erro interno do servidor
  */
 export class InternalServerError extends AppError {
-  constructor(message: string = 'Erro interno do servidor', details?: any) {
+  constructor(message: string = 'Erro interno do servidor', details?: unknown) {
     super(message, 500, true, 'INTERNAL_SERVER_ERROR', details)
     this.name = 'InternalServerError'
   }
@@ -113,7 +113,7 @@ export class ServiceUnavailableError extends AppError {
  * Erro de negócio/regra de negócio
  */
 export class BusinessError extends AppError {
-  constructor(message: string, statusCode: number = 400, details?: any) {
+  constructor(message: string, statusCode: number = 400, details?: unknown) {
     super(message, statusCode, true, 'BUSINESS_ERROR', details)
     this.name = 'BusinessError'
   }
@@ -133,7 +133,7 @@ export class TokenError extends AppError {
  * Erro de banco de dados
  */
 export class DatabaseError extends AppError {
-  constructor(message: string = 'Erro de banco de dados', details?: any) {
+  constructor(message: string = 'Erro de banco de dados', details?: unknown) {
     super(message, 500, true, 'DATABASE_ERROR', details)
     this.name = 'DatabaseError'
   }
@@ -153,7 +153,7 @@ export class FileError extends AppError {
  * Utilitário para criar erros baseados em códigos Prisma
  */
 export class PrismaErrorHandler {
-  static handle(error: any): AppError {
+  static handle(error: unknown): AppError {
     if (!error.code) {
       return new DatabaseError('Erro desconhecido do banco de dados', error)
     }
@@ -229,8 +229,8 @@ export const isOperationalError = (error: Error): boolean => {
 /**
  * Utilitário para formatar erros para logging
  */
-export const formatErrorForLogging = (error: Error, context?: any) => {
-  const errorInfo: any = {
+export const formatErrorForLogging = (error: Error, context?: unknown) => {
+  const errorInfo: Record<string, unknown> = {
     name: error.name,
     message: error.message,
     stack: error.stack,

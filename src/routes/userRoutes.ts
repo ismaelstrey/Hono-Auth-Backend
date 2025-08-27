@@ -20,7 +20,6 @@ import {
   updateUserSchema,
   updateProfileSchema,
   userIdSchema,
-  userFiltersSchema,
   userSettingsSchema,
   bulkUserOperationSchema,
   changeUserRoleSchema

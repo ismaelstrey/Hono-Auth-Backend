@@ -72,11 +72,21 @@ export const generateResetToken = (): string => {
 }
 
 /**
+ * Interface para token de reset
+ */
+interface ResetTokenPayload {
+  type: string
+  timestamp: number
+  iat?: number
+  exp?: number
+}
+
+/**
  * Verifica um token de reset de senha
  */
 export const verifyResetToken = (token: string): boolean => {
   try {
-    const decoded = jwt.verify(token, JWT_SECRET) as any
+    const decoded = jwt.verify(token, JWT_SECRET) as ResetTokenPayload
     return decoded.type === 'password-reset'
   } catch (error) {
     return false

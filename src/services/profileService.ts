@@ -96,13 +96,13 @@ export interface ProfileResponse {
   languages: string[] | null
   skills: string[] | null
   interests: string[] | null
-  education: any
-  experience: any
+  education: Record<string, unknown> | null
+  experience: Record<string, unknown> | null
   
   // Configurações e preferências
-  address: any
-  preferences: any
-  socialLinks: any
+  address: Record<string, unknown> | null
+  preferences: Record<string, unknown> | null
+  socialLinks: Record<string, unknown> | null
   
   // Configurações de privacidade
   isPublic: boolean
@@ -296,7 +296,7 @@ class ProfileService {
       let existingProfile = await profileRepository.findByUserId(userId)
       if (!existingProfile) {
         logger.info(`Criando perfil básico para usuário ${userId} durante upload de avatar`)
-        const basicProfile = await profileRepository.create({ userId })
+        await profileRepository.create({ userId })
         existingProfile = await profileRepository.findByUserId(userId)
         if (!existingProfile) {
           throw new InternalServerError('Erro ao criar perfil básico')
@@ -509,7 +509,7 @@ class ProfileService {
     }
 
     // Validar telefone (formato básico)
-    if (data.phone && !/^[\+]?[1-9][\d\s\-\(\)]{8,15}$/.test(data.phone)) {
+    if (data.phone && !/^[+]?[1-9][\d\s\-()]{8,15}$/.test(data.phone)) {
       throw new ValidationError('Formato de telefone inválido')
     }
 

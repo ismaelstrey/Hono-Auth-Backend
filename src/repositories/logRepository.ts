@@ -268,11 +268,11 @@ export class LogRepository {
     const where: any = {}
 
     // Filtros de texto avançados
-     if (filters.search) {
-       const searchFields = ['action', 'resource', 'path', 'error', 'userAgent']
-       const searchQuery = createSearchQuery(filters.search, searchFields)
-       Object.assign(where, searchQuery)
-     }
+    if (filters.search) {
+      const searchFields = ['action', 'resource', 'path', 'error', 'userAgent']
+      const searchQuery = createSearchQuery(filters.search, searchFields)
+      Object.assign(where, searchQuery)
+    }
 
     // Filtros específicos
     if (filters.userId) where.userId = filters.userId
