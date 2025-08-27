@@ -19,6 +19,7 @@ import {
   bulkUserOperationSchema,
   changeUserRoleSchema
 } from '@/validators/userValidators'
+import { userQuerySchema } from '@/validators/queryValidators'
 
 /**
  * Rotas de usuários
@@ -36,7 +37,7 @@ userRoutes.use('*', authMiddleware)
 userRoutes.get(
   '/search',
   rateLimitPublic,
-  zValidator('query', userFiltersSchema),
+  zValidator('query', userQuerySchema),
   UserController.handleListUsers
 )
 
@@ -93,7 +94,7 @@ userRoutes.post(
 userRoutes.get(
   '/',
   requireAdminOrModerator,
-  zValidator('query', userFiltersSchema),
+  zValidator('query', userQuerySchema),
   UserController.handleListUsers
 )
 

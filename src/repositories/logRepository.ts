@@ -1,6 +1,8 @@
 import { PrismaClient } from '@prisma/client'
 import type { LogEntry } from '@/types'
 import { DatabaseError } from '@/utils/errors'
+import type { PaginationParams, PaginatedResult, SortParams, FilterParams } from '@/utils/pagination'
+import { createPaginatedResult, createSearchQuery, parseDateFilters } from '@/utils/pagination'
 
 /**
  * Repositório para operações de logs usando Prisma
@@ -42,7 +44,45 @@ export class LogRepository {
   }
 
   /**
-   * Busca logs com filtros
+   * Busca logs com paginação, filtros e busca avançados
+   */
+  async findManyAdvanced(
+    pagination: PaginationParams,
+    sort: SortParams = {},
+    filters: FilterParams = {}
+  ): Promise<PaginatedResult<LogEntry>> {
+    try {
+      const whereClause = this.buildLogWhereClause(filters)
+      const orderBy = this.buildLogOrderBy(sort)
+
+      const [logs, total] = await Promise.all([
+        this.prisma.log.findMany({
+          where: whereClause,
+          skip: pagination.offset,
+          take: pagination.limit,
+          orderBy,
+          include: {
+            user: {
+              select: {
+                id: true,
+                name: true,
+                email: true
+              }
+            }
+          }
+        }),
+        this.prisma.log.count({ where: whereClause })
+      ])
+
+      const mappedLogs = logs.map(log => this.mapPrismaLogToLogEntry(log))
+      return createPaginatedResult(mappedLogs, total, pagination)
+    } catch (error) {
+      throw new DatabaseError('Erro ao buscar logs', error)
+    }
+  }
+
+  /**
+   * Busca logs com filtros (método legado)
    */
   async findMany(filters: {
     userId?: string
@@ -219,6 +259,49 @@ export class LogRepository {
     if (statusCode >= 400) return 'warn'
     if (statusCode >= 300) return 'info'
     return 'info'
+  }
+
+  /**
+   * Constrói cláusula WHERE para logs
+   */
+  private buildLogWhereClause(filters: FilterParams): any {
+    const where: any = {}
+
+    // Filtros de texto
+     if (filters.search) {
+       const searchFields = ['action', 'resource', 'path', 'error']
+       const searchQuery = createSearchQuery(filters.search, searchFields)
+       Object.assign(where, searchQuery)
+     }
+
+    // Filtros específicos
+    if (filters.userId) where.userId = filters.userId
+    if (filters.action) where.action = filters.action
+    if (filters.resource) where.resource = filters.resource
+    if (filters.level) where.level = filters.level
+    if (filters.method) where.method = filters.method
+    if (filters.statusCode) where.statusCode = filters.statusCode
+
+    // Filtros de data
+    const dateFilters = parseDateFilters(filters)
+    if (dateFilters.dateFrom || dateFilters.dateTo) {
+      where.timestamp = {}
+      if (dateFilters.dateFrom) where.timestamp.gte = dateFilters.dateFrom
+      if (dateFilters.dateTo) where.timestamp.lte = dateFilters.dateTo
+    }
+
+    return where
+  }
+
+  /**
+   * Constrói cláusula ORDER BY para logs
+   */
+  private buildLogOrderBy(sort: SortParams): any {
+    const validSortFields = ['timestamp', 'action', 'resource', 'level', 'statusCode', 'duration']
+    const sortField = validSortFields.includes(sort.sortBy || '') ? sort.sortBy : 'timestamp'
+    const sortOrder = sort.sortOrder === 'asc' ? 'asc' : 'desc'
+
+    return { [sortField as string]: sortOrder }
   }
 
   /**

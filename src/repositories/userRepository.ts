@@ -1,6 +1,22 @@
 import { prisma } from '@/config/database'
 import type { User, CreateUserData, UpdateUserData, UserFilters } from '@/types'
 import { UserRole } from '@/types'
+import type { PaginationParams, PaginatedResult, SortParams, FilterParams } from '@/utils/pagination'
+import { createPaginatedResult, createSearchQuery, createSortQuery, parseDateFilters } from '@/utils/pagination'
+
+// Mapeamento de UserRole para roleId
+const ROLE_ID_MAPPING: Record<UserRole, string> = {
+  [UserRole.ADMIN]: 'admin_role',
+  [UserRole.USER]: 'user_role',
+  [UserRole.MODERATOR]: 'moderator_role'
+}
+
+// Mapeamento reverso de roleId para UserRole
+const ROLE_NAME_MAPPING: Record<string, UserRole> = {
+  'admin_role': UserRole.ADMIN,
+  'user_role': UserRole.USER,
+  'moderator_role': UserRole.MODERATOR
+}
 
 /**
  * Repositório para operações com usuários usando Prisma
@@ -11,7 +27,10 @@ export class UserRepository {
    */
   async findById(id: string): Promise<User | null> {
     const user = await prisma.user.findUnique({
-      where: { id }
+      where: { id },
+      include: {
+        role: true
+      }
     })
 
     if (!user) return null
@@ -24,7 +43,10 @@ export class UserRepository {
    */
   async findByEmail(email: string): Promise<User | null> {
     const user = await prisma.user.findUnique({
-      where: { email: email.toLowerCase() }
+      where: { email: email.toLowerCase() },
+      include: {
+        role: true
+      }
     })
 
     if (!user) return null
@@ -36,13 +58,18 @@ export class UserRepository {
    * Cria um novo usuário
    */
   async create(userData: CreateUserData): Promise<User> {
+    const roleId = ROLE_ID_MAPPING[userData.role || UserRole.USER]
+    
     const newUser = await prisma.user.create({
       data: {
         email: userData.email.toLowerCase(),
         password: userData.password,
         name: userData.name,
-        role: userData.role || UserRole.USER,
+        roleId: roleId,
         isActive: true
+      },
+      include: {
+        role: true
       }
     })
 
@@ -54,11 +81,18 @@ export class UserRepository {
    */
   async update(id: string, updateData: UpdateUserData): Promise<User | null> {
     try {
+      // Se está atualizando role, converter para roleId
+      const dataToUpdate: any = { ...updateData, updatedAt: new Date() }
+      if (updateData.role) {
+        dataToUpdate.roleId = ROLE_ID_MAPPING[updateData.role]
+        delete dataToUpdate.role
+      }
+      
       const updatedUser = await prisma.user.update({
         where: { id },
-        data: {
-          ...updateData,
-          updatedAt: new Date()
+        data: dataToUpdate,
+        include: {
+          role: true
         }
       })
 
@@ -83,56 +117,106 @@ export class UserRepository {
   }
 
   /**
-   * Lista usuários com filtros e paginação
+   * Lista usuários com paginação, filtros e busca avançados
    */
-  async findMany(filters: UserFilters = {}): Promise<{
-    users: User[]
-    total: number
-    page: number
-    limit: number
-    totalPages: number
-  }> {
-    const where: any = {}
-
-    // Aplicar filtros
-    if (filters.role) {
-      where.role = filters.role
-    }
-
-    if (filters.isActive !== undefined) {
-      where.isActive = filters.isActive
-    }
-
-    if (filters.search) {
-      where.OR = [
-        { name: { contains: filters.search, mode: 'insensitive' } },
-        { email: { contains: filters.search, mode: 'insensitive' } }
-      ]
-    }
-
-    const page = filters.page || 1
-    const limit = filters.limit || 10
-    const skip = (page - 1) * limit
+  async findMany(
+    pagination: PaginationParams,
+    sort: SortParams = {},
+    filters: FilterParams = {}
+  ): Promise<PaginatedResult<User>> {
+    const whereClause = this.buildUserWhereClause(filters)
+    const orderBy = this.buildUserOrderBy(sort)
 
     const [users, total] = await Promise.all([
       prisma.user.findMany({
-        where,
-        skip,
-        take: limit,
-        orderBy: { createdAt: 'desc' }
+        where: whereClause,
+        skip: pagination.offset,
+        take: pagination.limit,
+        orderBy,
+        include: {
+          role: true,
+          profile: {
+            select: {
+              firstName: true,
+              lastName: true,
+              avatar: true
+            }
+          }
+        }
       }),
-      prisma.user.count({ where })
+      prisma.user.count({ where: whereClause })
     ])
 
-    const totalPages = Math.ceil(total / limit)
+    const mappedUsers = users.map(user => this.mapPrismaUserToUser(user))
+    return createPaginatedResult(mappedUsers, total, pagination)
+  }
 
-    return {
-      users: users.map(user => this.mapPrismaUserToUser(user)),
-      total,
-      page,
-      limit,
-      totalPages
+  /**
+   * Constrói cláusula WHERE para consultas de usuários
+   */
+  private buildUserWhereClause(filters: FilterParams): any {
+    const where: any = {}
+
+    // Filtros básicos
+    if (filters.status) {
+      switch (filters.status) {
+        case 'active':
+          where.isActive = true
+          where.lockedUntil = null
+          break
+        case 'inactive':
+          where.isActive = false
+          break
+        case 'locked':
+          where.lockedUntil = { gt: new Date() }
+          break
+      }
     }
+
+    if (filters.role) {
+      // Converter UserRole para roleId
+      where.roleId = ROLE_ID_MAPPING[filters.role as UserRole]
+    }
+
+    if (filters.emailVerified !== undefined) {
+      where.emailVerified = filters.emailVerified
+    }
+
+    // Filtros de data
+    const dateFilters = parseDateFilters(filters)
+    if (dateFilters.dateFrom || dateFilters.dateTo) {
+      where.createdAt = {}
+      if (dateFilters.dateFrom) {
+        where.createdAt.gte = dateFilters.dateFrom
+      }
+      if (dateFilters.dateTo) {
+        where.createdAt.lte = dateFilters.dateTo
+      }
+    }
+
+    // Busca textual
+    if (filters.search) {
+      const searchFields = ['name', 'email']
+      const searchQuery = createSearchQuery(filters.search, searchFields)
+      Object.assign(where, searchQuery)
+    }
+
+    return where
+  }
+
+  /**
+   * Constrói cláusula ORDER BY para consultas de usuários
+   */
+  private buildUserOrderBy(sort: SortParams): any {
+    const allowedSortFields = [
+      'name', 'email', 'role', 'createdAt', 'updatedAt', 'lastLogin'
+    ]
+
+    if (sort.sortBy && allowedSortFields.includes(sort.sortBy)) {
+      return { [sort.sortBy]: sort.sortOrder || 'asc' }
+    }
+
+    return { createdAt: 'desc' } // Ordenação padrão
   }
 
   /**
@@ -193,6 +277,9 @@ export class UserRepository {
         data: {
           isActive: !user.isActive,
           updatedAt: new Date()
+        },
+        include: {
+          role: true
         }
       })
 
@@ -214,6 +301,9 @@ export class UserRepository {
           emailVerificationToken: null,
           emailVerificationExpires: null,
           updatedAt: new Date()
+        },
+        include: {
+          role: true
         }
       })
 
@@ -420,9 +510,9 @@ export class UserRepository {
     const [total, active, adminCount, moderatorCount, userCount] = await Promise.all([
       prisma.user.count(),
       prisma.user.count({ where: { isActive: true } }),
-      prisma.user.count({ where: { role: UserRole.ADMIN } }),
-      prisma.user.count({ where: { role: UserRole.MODERATOR } }),
-      prisma.user.count({ where: { role: UserRole.USER } })
+      prisma.user.count({ where: { roleId: ROLE_ID_MAPPING[UserRole.ADMIN] } }),
+      prisma.user.count({ where: { roleId: ROLE_ID_MAPPING[UserRole.MODERATOR] } }),
+      prisma.user.count({ where: { roleId: ROLE_ID_MAPPING[UserRole.USER] } })
     ])
 
     const inactive = total - active
@@ -449,12 +539,16 @@ export class UserRepository {
    * Mapeia usuário do Prisma para o tipo User da aplicação
    */
   private mapPrismaUserToUser(prismaUser: any): User {
+    // Mapear role do relacionamento para UserRole enum
+    const roleName = prismaUser.role?.name || 'user'
+    const userRole = ROLE_NAME_MAPPING[prismaUser.roleId] || UserRole.USER
+    
     return {
       id: prismaUser.id,
       email: prismaUser.email,
       password: prismaUser.password,
       name: prismaUser.name,
-      role: prismaUser.role as UserRole,
+      role: userRole,
       isActive: prismaUser.isActive,
       emailVerified: prismaUser.emailVerified || false,
       failedLoginAttempts: prismaUser.failedLoginAttempts || 0,

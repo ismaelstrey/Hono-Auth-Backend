@@ -3,6 +3,7 @@ import { logger } from 'hono/logger'
 import { cors } from 'hono/cors'
 import { secureHeaders } from 'hono/secure-headers'
 import { prettyJSON } from 'hono/pretty-json'
+import { serveStatic } from '@hono/node-server/serve-static'
 import { serve } from '@hono/node-server'
 import { swaggerUI } from '@hono/swagger-ui'
 import 'dotenv/config'
@@ -15,6 +16,8 @@ import { errorHandler } from '@/middlewares/errorHandler'
 import { authRoutes } from '@/routes/authRoutes'
 import { userRoutes } from '@/routes/userRoutes'
 import { logRoutes } from '@/routes/logRoutes'
+import { profileRoutes } from '@/routes/profileRoutes'
+import { notificationRoutes } from '@/routes/notificationRoutes'
 import { env, config } from '@/config/env'
 import { connectDatabase } from '@/config/database'
 
@@ -41,6 +44,9 @@ app.get('/', (c) => {
     timestamp: new Date().toISOString()
   })
 })
+
+// Servir arquivos estáticos (uploads)
+app.use('/uploads/*', serveStatic({ root: './' }))
 
 // Rota para limpar rate limiting (apenas em desenvolvimento)
 if (env.NODE_ENV === 'development') {
@@ -78,6 +84,8 @@ if (env.NODE_ENV === 'development') {
 app.route('/api/auth', authRoutes)
 app.route('/api/users', userRoutes)
 app.route('/api/logs', logRoutes)
+app.route('/api/profiles', profileRoutes)
+app.route('/api/notifications', notificationRoutes)
 
 // Documentação Swagger
 if (config.features.swagger) {

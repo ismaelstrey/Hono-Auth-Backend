@@ -1,0 +1,65 @@
+{
+  "users": [
+    {
+      "id": "cmen9i50h0000vah0cbzvkhyo",
+      "role": "user",
+      "email": "joao@teste.com"
+    },
+    {
+      "id": "cmen9t6im0000vaiwb0c9v8bj",
+      "role": "user",
+      "email": "maria@teste.com"
+    },
+    {
+      "id": "cmesmorgd0000vaygbmjcofht",
+      "role": "user",
+      "email": "test2@example.com"
+    },
+    {
+      "id": "cmesn089s0000vax05qu1l01n",
+      "role": "user",
+      "email": "user@casa.com"
+    },
+    {
+      "id": "cmesoeat80000vas47b139vdw",
+      "role": "user",
+      "email": "teste.prisma@example.com"
+    },
+    {
+      "id": "cmesw6kc60000vadki86boi3d",
+      "role": "user",
+      "email": "teste.verificacao@exemplo.com"
+    },
+    {
+      "id": "cmesyoyvm0000va2w5dfgx37d",
+      "role": "ADMIN",
+      "email": "admin@example.com"
+    },
+    {
+      "id": "cmet34uot0008wx20oxm43c35",
+      "role": "user",
+      "email": "alice@example.com"
+    },
+    {
+      "id": "cmet365ac000dwx208zz3lbp2",
+      "role": "admin",
+      "email": "lice@example.com"
+    },
+    {
+      "id": "cmet4953b0009wx90d8bk7unc",
+      "role": "user",
+      "email": "ismael@strey.com"
+    },
+    {
+      "id": "cmet4as4u000ewx90tplz7ri9",
+      "role": "admin",
+      "email": "jaque@strey.com"
+    },
+    {
+      "id": "cmet4nbk70002wxool1nc3gwr",
+      "role": "user",
+      "email": "teste@exemplo.com"
+    }
+  ],
+  "timestamp": "2025-08-26T23:35:15.831Z"
+}

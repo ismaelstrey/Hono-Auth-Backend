@@ -2,6 +2,7 @@ import type { Context } from 'hono'
 import { UserService } from '@/services/userService'
 import { successResponse, errorResponse } from '@/utils/helpers'
 import type { JWTPayload } from '@/types'
+import { extractPaginationParams, extractSortParams, extractFilterParams } from '@/utils/pagination'
 
 /**
  * Controlador de usuários
@@ -10,15 +11,17 @@ export class UserController {
   private static userService = new UserService()
 
   /**
-   * Lista usuários com filtros e paginação
-   */
-  /**
-   * Lista usuários com filtros e paginação
+   * Lista usuários com paginação, filtros e busca avançados
    */
   static async handleListUsers(c: Context) {
     try {
-      const filters = (c.req as any).valid('query')
-      const result = await this.userService.listUsers(filters)
+      const query = (c.req as any).valid('query')
+      
+      const pagination = extractPaginationParams(query)
+      const sort = extractSortParams(query)
+      const filters = extractFilterParams(query)
+      
+      const result = await this.userService.listUsers(pagination, sort, filters)
 
       return c.json(successResponse(result))
     } catch (error) {

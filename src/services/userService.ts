@@ -8,6 +8,7 @@ import type {
   UserFilters,
   UserRole
 } from '@/types'
+import type { PaginationParams, PaginatedResult, SortParams, FilterParams } from '@/utils/pagination'
 
 /**
  * Serviço de usuários
@@ -36,22 +37,49 @@ export class UserService {
   }
 
   /**
-   * Lista usuários com filtros e paginação
+   * Lista usuários com paginação, filtros e busca avançados
    */
-  async getUsers(filters: UserFilters = {}) {
-    const result = await userRepository.findMany(filters)
+  async listUsers(
+    pagination: PaginationParams,
+    sort: SortParams = {},
+    filters: FilterParams = {}
+  ): Promise<PaginatedResult<User>> {
+    const result = await userRepository.findMany(pagination, sort, filters)
     
     return {
       ...result,
-      users: result.users.map(user => sanitizeUser(user))
+      data: result.data.map(user => sanitizeUser(user))
     }
   }
 
   /**
-   * Lista usuários (alias para getUsers)
+   * Lista usuários com filtros e paginação (método legado)
    */
-  async listUsers(filters: UserFilters = {}) {
-    return this.getUsers(filters)
+  async getUsers(filters: UserFilters = {}) {
+    // Converter filtros antigos para novos parâmetros
+    const pagination = {
+      page: filters.page || 1,
+      limit: filters.limit || 10,
+      offset: ((filters.page || 1) - 1) * (filters.limit || 10)
+    }
+    
+    const filterParams = {
+      search: filters.search,
+      role: filters.role,
+      status: filters.isActive !== undefined ? (filters.isActive ? 'active' : 'inactive') : undefined,
+      emailVerified: filters.emailVerified
+    }
+    
+    const result = await this.listUsers(pagination, {}, filterParams)
+    
+    // Converter resultado para formato antigo
+    return {
+      users: result.data,
+      total: result.pagination.total,
+      page: result.pagination.page,
+      limit: result.pagination.limit,
+      totalPages: result.pagination.totalPages
+    }
   }
 
   /**
@@ -239,13 +267,19 @@ export class UserService {
    * Busca usuários por termo
    */
   async searchUsers(searchTerm: string, limit: number = 10): Promise<User[]> {
-    const result = await userRepository.findMany({
-      search: searchTerm,
+    const pagination = {
+      page: 1,
       limit,
-      page: 1
-    })
+      offset: 0
+    }
+    
+    const filters = {
+      search: searchTerm
+    }
+    
+    const result = await userRepository.findMany(pagination, {}, filters)
 
-    return result.users.map(user => sanitizeUser(user))
+    return result.data.map(user => sanitizeUser(user))
   }
 
   /**
@@ -313,13 +347,16 @@ export class UserService {
    * Obtém usuários recentemente ativos
    */
   async getRecentlyActiveUsers(limit: number = 10): Promise<User[]> {
-    const result = await userRepository.findMany({
-      limit,
-      page: 1
-    })
+    const pagination = {
+      page: 1,
+      limit: 100, // Get more users to filter from
+      offset: 0
+    }
+    
+    const result = await userRepository.findMany(pagination, {}, {})
 
     // Filtra usuários com lastLogin e ordena por data
-    const activeUsers = result.users
+    const activeUsers = result.data
       .filter(user => user.lastLogin)
       .sort((a, b) => {
         if (!a.lastLogin || !b.lastLogin) return 0
@@ -334,8 +371,18 @@ export class UserService {
    * Obtém usuários por role
    */
   async getUsersByRole(role: UserRole): Promise<User[]> {
-    const result = await userRepository.findMany({ role })
-    return result.users.map(user => sanitizeUser(user))
+    const pagination = {
+      page: 1,
+      limit: 100,
+      offset: 0
+    }
+    
+    const filters = {
+      role
+    }
+    
+    const result = await userRepository.findMany(pagination, {}, filters)
+    return result.data.map(user => sanitizeUser(user))
   }
 }
 

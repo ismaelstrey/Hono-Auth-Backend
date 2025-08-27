@@ -2,3 +2,8 @@
 /dist
 
 /src/generated/prisma
+
+# Uploads
+/uploads/*
+!/uploads/.gitkeep
+!/uploads/avatars/.gitkeep

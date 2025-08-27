@@ -15,7 +15,7 @@ model User {
   name                  String
   email                 String   @unique
   password              String
-  role                  String   @default("user")
+  roleId                String   @default("user_role")
   isActive              Boolean  @default(true)
   emailVerified         Boolean  @default(false)
   emailVerificationToken String?
@@ -29,10 +29,81 @@ model User {
   createdAt             DateTime @default(now())
   updatedAt             DateTime @updatedAt
 
-  // Relacionamento com logs
+  // Relacionamentos
+  role                  Role     @relation(fields: [roleId], references: [id])
+  profile               UserProfile?
   logs                  Log[]
+  notifications         Notification[]
+  notificationPreferences NotificationPreference[]
 
   @@map("users")
+  @@index([roleId])
+}
+
+model Role {
+  id          String   @id @default(cuid())
+  name        String   @unique
+  description String?
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  // Relacionamentos
+  users       User[]
+  permissions RolePermission[]
+
+  @@map("roles")
+}
+
+model Permission {
+  id          String   @id @default(cuid())
+  name        String   @unique
+  resource    String   // ex: "users", "posts", "admin"
+  action      String   // ex: "create", "read", "update", "delete"
+  description String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  // Relacionamentos
+  roles       RolePermission[]
+
+  @@map("permissions")
+  @@unique([resource, action])
+}
+
+model RolePermission {
+  id           String     @id @default(cuid())
+  roleId       String
+  permissionId String
+  createdAt    DateTime   @default(now())
+
+  // Relacionamentos
+  role         Role       @relation(fields: [roleId], references: [id], onDelete: Cascade)
+  permission   Permission @relation(fields: [permissionId], references: [id], onDelete: Cascade)
+
+  @@map("role_permissions")
+  @@unique([roleId, permissionId])
+}
+
+model UserProfile {
+  id          String    @id @default(cuid())
+  userId      String    @unique
+  firstName   String?
+  lastName    String?
+  avatar      String?   // URL ou caminho do avatar
+  bio         String?
+  phone       String?
+  dateOfBirth DateTime?
+  address     String?   // JSON string para endereço completo
+  preferences String?   // JSON string para preferências do usuário
+  socialLinks String?   // JSON string para links de redes sociais
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  // Relacionamento
+  user        User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("user_profiles")
 }
 
 model Log {
@@ -60,4 +131,100 @@ model Log {
   @@index([level])
   @@index([action])
   @@index([resource])
+}
+
+model NotificationType {
+  id          String   @id @default(cuid())
+  name        String   @unique // ex: "welcome", "password_reset", "profile_update", "system_alert"
+  description String?
+  category    String   // ex: "auth", "profile", "system", "marketing"
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  // Relacionamentos
+  notifications Notification[]
+  templates     NotificationTemplate[]
+  preferences   NotificationPreference[]
+
+  @@map("notification_types")
+}
+
+model Notification {
+  id              String   @id @default(cuid())
+  userId          String
+  typeId          String
+  title           String
+  message         String
+  data            String?  // JSON string para dados adicionais
+  channel         String   // "email", "push", "sms", "in_app"
+  status          String   @default("pending") // "pending", "sent", "delivered", "failed", "read"
+  priority        String   @default("normal") // "low", "normal", "high", "urgent"
+  scheduledFor    DateTime?
+  sentAt          DateTime?
+  readAt          DateTime?
+  failureReason   String?
+  retryCount      Int      @default(0)
+  maxRetries      Int      @default(3)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  // Relacionamentos
+  user            User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  type            NotificationType @relation(fields: [typeId], references: [id])
+
+  @@map("notifications")
+  @@index([userId])
+  @@index([typeId])
+  @@index([status])
+  @@index([channel])
+  @@index([priority])
+  @@index([scheduledFor])
+  @@index([createdAt])
+}
+
+model NotificationPreference {
+  id        String   @id @default(cuid())
+  userId    String
+  typeId    String
+  email     Boolean  @default(true)
+  push      Boolean  @default(true)
+  sms       Boolean  @default(false)
+  inApp     Boolean  @default(true)
+  frequency String   @default("immediate") // "immediate", "daily", "weekly", "never"
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Relacionamentos
+  user      User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  type      NotificationType @relation(fields: [typeId], references: [id], onDelete: Cascade)
+
+  @@map("notification_preferences")
+  @@unique([userId, typeId])
+  @@index([userId])
+  @@index([typeId])
+}
+
+model NotificationTemplate {
+  id          String   @id @default(cuid())
+  typeId      String
+  channel     String   // "email", "push", "sms", "in_app"
+  language    String   @default("pt-BR")
+  subject     String?  // Para emails
+  title       String?  // Para push/in-app
+  body        String   // Template do corpo da mensagem
+  htmlBody    String?  // Template HTML para emails
+  variables   String?  // JSON string com variáveis disponíveis
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  // Relacionamentos
+  type        NotificationType @relation(fields: [typeId], references: [id], onDelete: Cascade)
+
+  @@map("notification_templates")
+  @@unique([typeId, channel, language])
+  @@index([typeId])
+  @@index([channel])
+  @@index([language])
 }
